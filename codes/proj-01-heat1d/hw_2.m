@@ -105,11 +105,12 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
     x_sam = zeros(n_el * n_sam + 1, 1);% coordinate
     y_sam = x_sam; % store the exact solution value at sampling points
     u_sam = x_sam; % store the numerical solution value at sampling pts
-
+    ud_sam= x_sam;
+    yd_sam= x_sam;
     for ee = 1 : n_el
         x_ele = x_coor( IEN(ee, :) );
         u_ele = disp( IEN(ee, :) );
-
+        
         if ee == n_el
             n_sam_end = n_sam+1;
         else
@@ -119,22 +120,27 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
         for ll = 1 : n_sam_end
             x_l = 0.0;
             u_l = 0.0;
+            x_ld=0;    %d means dot
+            u_ld=0
             for aa = 1 : n_en
                 x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
                 u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
+                u_ld = u_ld + u_ele(aa) * PolyShape(pp+1, aa, xi_sam(ll), 0);
             end
 
             x_sam( (ee-1)*n_sam + ll ) = x_l;
             u_sam( (ee-1)*n_sam + ll ) = u_l;
+            ud_sam(( (ee-1)*n_sam + ll ))=u_ld;
             y_sam( (ee-1)*n_sam + ll ) = x_l^5;
+            yd_sam( (ee-1)*n_sam + ll ) =5*x_l^4;
         end
     end
    
     for nn=1:1:length(ui)      % calculate the integration
     integ1=integ1+weight2(nn)*(u_sam(nn)-y_sam(nn)).^2;
     integ2=integ2+weight2(nn)*u_sam(nn).^2;
-    integ_1=integ_1+weight2(nn)*
-    integ_2=integ_2+weight2(nn)*
+    integ_1=integ_1+weight2(nn)*(ud_sam(nn)-yd_sam(nn)).^2;
+    integ_2=integ_2+weight2(nn)*(ud_sam(nn)).^2;
     end
     err(n_el/2)=integ1/integ2;
     eh1(n_el/2)=integ_1/integ_2;
