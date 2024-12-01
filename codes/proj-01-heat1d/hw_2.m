@@ -14,7 +14,7 @@ pp   = 2;              % polynomial degree
 n_en = pp + 1;         % number of element or local nodes 3
 err=zeros(8,1);        % 创建一个数列储存误差
 eh1=err;               % first order error
-n_el=2      % number of elements 使得函数hh从2到16循环
+for n_el=2:2:16      % number of elements 使得函数hh从2到16循环
     n_np = n_el * pp + 1;  % number of nodal points  5
     n_eq = n_np - 1;       % number of equations  4
     n_int = 10;
@@ -100,7 +100,7 @@ n_el=2      % number of elements 使得函数hh从2到16循环
 
     n_sam = 20;
     xi_sam = -1 : (2/n_sam) : 1;
-    
+
     x_sam = zeros(n_el * n_sam + 1, 1);% coordinate
     y_sam = x_sam; % store the exact solution value at sampling points
     u_sa = x_sam; % store the numerical solution value at sampling pts
@@ -132,35 +132,46 @@ n_el=2      % number of elements 使得函数hh从2到16循环
             yd_sam( (ee-1)*n_sam + ll ) =5*x_l^4;
         end
     end
-     % calculate the integration
-     for mm=0:n_el-1
-        [ui, weight2] = Gauss(n_int, x_coor(mm*pp+1), x_coor((mm+1)*pp+1));%更换积分区间 一阶表示ui
+    % calculate the integration
+    u_f=zeros(n_el,1);
+    u_fd=u_f;%means final
+    y_f=u_f;
+    yd_f=u_f;
+    for mm=1:n_el
+        [ui, weight2] = Gauss(n_int, x_coor((mm-1)*pp+1), x_coor(mm*pp+1));%更换积分区间 一阶表示ui
         x1sam=ui;
         for ii=1:n_int  %小区间积分
-            x_s=0;
             u_s=0;
             u_sd=0;
-            for aa = 1 : x1sam
-                x_s = x_s + ui(aa) * PolyShape(pp, aa, x1sam(ii), 0);
+            y_s=0;
+            y_sd=0;
+            for aa = 1 : n_en
                 u_s = u_s + ui(aa) * PolyShape(pp, aa, x1sam(ii), 0);%积分所需u
-                u_sd = u_sd + u_ele(aa) * PolyShape(pp, aa, x1sam(ii), 1);
+                u_sd = u_sd + ui(aa) * PolyShape(pp, aa, x1sam(ii), 1);
+                y_s = y_s + ui(aa) * PolyShape(pp, aa, y_sam(ii), 0);%积分所需u
+                y_sd = y_sd + ui(aa) * PolyShape(pp, aa, yd_sam(ii), 1);
             end
+            u_f(mm)=u_s;
+            u_fd(mm)=u_sd;
+            y_f(mm)=y_s;
+            y_fd(mm)=y_sd;
         end             %得到x u u一阶导
         %quardratic将积分弄出，最好是存到某一数组里面
         %求和，利用quadratic把y弄出了，最后得到e
         %待实现
-        for nn=1:length(ui)
-        integ1=integ1+weight2(nn)*(u_sam(nn)-y_sam(nn)).^2;  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
-        integ2=integ2+weight2(nn)*u_sam(nn).^2;
-        integ_1=integ_1+weight2(nn)*(ud_sam(nn)-yd_sam(nn)).^2;
-        integ_2=integ_2+weight2(nn)*(ud_sam(nn)).^2;
-        end
-     end
-    
+    end
+    [yi,weight3]=Gauss(n_el, 0, 1);
+    for nn=1:length(yi)
+        integ1=integ1+weight3(nn)*(u_f(nn)-y_f(nn)).^2;  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
+        integ2=integ2+weight3(nn)*u_f(nn).^2;
+        integ_1=integ_1+weight3(nn)*(u_fd(nn)-y_fd(nn)).^2;
+        integ_2=integ_2+weight3(nn)*(u_fd(nn)).^2;
+    end
+
     err(n_el/2)=integ1/integ2;
     eh1(n_el/2)=integ_1/integ_2;
-
-
+end
+%
 
 
 
