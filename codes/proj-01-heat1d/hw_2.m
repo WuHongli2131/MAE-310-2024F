@@ -1,4 +1,4 @@
-clear all; clc; clf; % clean the memory, screen, and figure
+clear all; clc;  % clean the memory, screen, and figure
 
 % Problem definition
 f = @(x) -20*x.^3; % f(x) is the source
@@ -12,7 +12,7 @@ integ_2=0;
 
 pp   = 2;              % polynomial degree
 n_en = pp + 1;         % number of element or local nodes 3
-err=zeros(8,1);         % 创建一个数列储存误差
+err=zeros(8,1);        % 创建一个数列储存误差
 eh1=err;               % first order error
 for n_el = 2:2:16              % number of elements 使得函数hh从2到16循环
     n_np = n_el * pp + 1;  % number of nodal points  5
@@ -101,7 +101,7 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
 
     n_sam = 20;
     xi_sam = -1 : (2/n_sam) : 1;
-    [ui, weight2] = Gauss(n_sam, -1, 1);
+   
     x_sam = zeros(n_el * n_sam + 1, 1);% coordinate
     y_sam = x_sam; % store the exact solution value at sampling points
     u_sam = x_sam; % store the numerical solution value at sampling pts
@@ -110,7 +110,7 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
     for ee = 1 : n_el
         x_ele = x_coor( IEN(ee, :) );
         u_ele = disp( IEN(ee, :) );
-        
+
         if ee == n_el
             n_sam_end = n_sam+1;
         else
@@ -120,12 +120,11 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
         for ll = 1 : n_sam_end
             x_l = 0.0;
             u_l = 0.0;
-            x_ld=0;    %d means dot
-            u_ld=0
+            u_ld=0;    %d means dot
             for aa = 1 : n_en
                 x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
                 u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
-                u_ld = u_ld + u_ele(aa) * PolyShape(pp+1, aa, xi_sam(ll), 0);
+                u_ld = u_ld + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1);
             end
 
             x_sam( (ee-1)*n_sam + ll ) = x_l;
@@ -135,12 +134,12 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
             yd_sam( (ee-1)*n_sam + ll ) =5*x_l^4;
         end
     end
-   
-    for nn=1:1:length(ui)      % calculate the integration
-    integ1=integ1+weight2(nn)*(u_sam(nn)-y_sam(nn)).^2;
-    integ2=integ2+weight2(nn)*u_sam(nn).^2;
-    integ_1=integ_1+weight2(nn)*(ud_sam(nn)-yd_sam(nn)).^2;
-    integ_2=integ_2+weight2(nn)*(ud_sam(nn)).^2;
+     [ui, weight2] = Gauss(n_el, -1, 1);
+    for nn=1:ui(n_el/2)     % calculate the integration
+        integ1=integ1+weight2(nn)*(u_sam(nn)-y_sam(nn)).^2;
+        integ2=integ2+weight2(nn)*u_sam(nn).^2;
+        integ_1=integ_1+weight2(nn)*(ud_sam(nn)-yd_sam(nn)).^2;
+        integ_2=integ_2+weight2(nn)*(ud_sam(nn)).^2;
     end
     err(n_el/2)=integ1/integ2;
     eh1(n_el/2)=integ_1/integ_2;
