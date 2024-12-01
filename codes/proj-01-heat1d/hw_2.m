@@ -1,4 +1,4 @@
-clear all; clc; clf; % clean the memory, screen, and figure
+clear all; clc;  % clean the memory, screen, and figure
 
 % Problem definition
 f = @(x) -20*x.^3; % f(x) is the source
@@ -12,9 +12,9 @@ integ_2=0;
 
 pp   = 2;              % polynomial degree
 n_en = pp + 1;         % number of element or local nodes 3
-err=zeros(8,1);         % 创建一个数列储存误差
+err=zeros(8,1);        % 创建一个数列储存误差
 eh1=err;               % first order error
-for n_el = 2:2:16              % number of elements 使得函数hh从2到16循环
+n_el=2      % number of elements 使得函数hh从2到16循环
     n_np = n_el * pp + 1;  % number of nodal points  5
     n_eq = n_np - 1;       % number of equations  4
     n_int = 10;
@@ -93,7 +93,6 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
 
     % Postprocessing: visualization
     %plot(x_coor, disp, '--r','LineWidth',3);
-
     %x_sam = 0 : 0.01 : 1;
     %y_sam = x_sam.^5;
     %hold on;
@@ -101,16 +100,16 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
 
     n_sam = 20;
     xi_sam = -1 : (2/n_sam) : 1;
-    [ui, weight2] = Gauss(n_sam, -1, 1);
+    
     x_sam = zeros(n_el * n_sam + 1, 1);% coordinate
     y_sam = x_sam; % store the exact solution value at sampling points
-    u_sam = x_sam; % store the numerical solution value at sampling pts
+    u_sa = x_sam; % store the numerical solution value at sampling pts
     ud_sam= x_sam;
     yd_sam= x_sam;
     for ee = 1 : n_el
         x_ele = x_coor( IEN(ee, :) );
         u_ele = disp( IEN(ee, :) );
-        
+
         if ee == n_el
             n_sam_end = n_sam+1;
         else
@@ -120,31 +119,46 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
         for ll = 1 : n_sam_end
             x_l = 0.0;
             u_l = 0.0;
-            x_ld=0;    %d means dot
-            u_ld=0
+            u_sd=0;    %d means dot
             for aa = 1 : n_en
                 x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
                 u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
-                u_ld = u_ld + u_ele(aa) * PolyShape(pp+1, aa, xi_sam(ll), 0);
+                u_sd = u_sd + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1);
             end
-
             x_sam( (ee-1)*n_sam + ll ) = x_l;
             u_sam( (ee-1)*n_sam + ll ) = u_l;
-            ud_sam(( (ee-1)*n_sam + ll ))=u_ld;
+            ud_sam(( (ee-1)*n_sam + ll ))=u_sd;
             y_sam( (ee-1)*n_sam + ll ) = x_l^5;
             yd_sam( (ee-1)*n_sam + ll ) =5*x_l^4;
         end
     end
-   
-    for nn=1:1:length(ui)      % calculate the integration
-    integ1=integ1+weight2(nn)*(u_sam(nn)-y_sam(nn)).^2;
-    integ2=integ2+weight2(nn)*u_sam(nn).^2;
-    integ_1=integ_1+weight2(nn)*(ud_sam(nn)-yd_sam(nn)).^2;
-    integ_2=integ_2+weight2(nn)*(ud_sam(nn)).^2;
-    end
+     % calculate the integration
+     for mm=0:n_el-1
+        [ui, weight2] = Gauss(n_int, x_coor(mm*pp+1), x_coor((mm+1)*pp+1));%更换积分区间 一阶表示ui
+        x1sam=ui;
+        for ii=1:n_int  %小区间积分
+            x_s=0;
+            u_s=0;
+            u_sd=0;
+            for aa = 1 : x1sam
+                x_s = x_s + ui(aa) * PolyShape(pp, aa, x1sam(ii), 0);
+                u_s = u_s + ui(aa) * PolyShape(pp, aa, x1sam(ii), 0);%积分所需u
+                u_sd = u_sd + u_ele(aa) * PolyShape(pp, aa, x1sam(ii), 1);
+            end
+        end             %得到x u u一阶导
+        %quardratic将积分弄出，最好是存到某一数组里面
+        %求和，利用quadratic把y弄出了，最后得到e
+        %待实现
+        for nn=1:length(ui)
+        integ1=integ1+weight2(nn)*(u_sam(nn)-y_sam(nn)).^2;  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
+        integ2=integ2+weight2(nn)*u_sam(nn).^2;
+        integ_1=integ_1+weight2(nn)*(ud_sam(nn)-yd_sam(nn)).^2;
+        integ_2=integ_2+weight2(nn)*(ud_sam(nn)).^2;
+        end
+     end
+    
     err(n_el/2)=integ1/integ2;
     eh1(n_el/2)=integ_1/integ_2;
-end
 
 
 
