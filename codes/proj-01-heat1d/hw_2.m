@@ -4,10 +4,7 @@ clear all; clc;  % clean the memory, screen, and figure
 f = @(x) -20*x.^3; % f(x) is the source
 g = 1.0;           % u    = g  at x = 1
 h = 0.0;           % -u,x = h  at x = 0
-integ1=0;          %临时积分变量
-integ2=0;
-integ_1=0;
-integ_2=0;
+
 % Setup the mesh
 
 pp   = 2;              % polynomial degree
@@ -161,6 +158,10 @@ for n_el=2:2:16      % number of elements 使得函数hh从2到16循环
         %待实现
     end
     [yi,weight3]=Gauss(n_el, 0, 1);
+    integ1=0;          %临时积分变量
+    integ2=0; %什么天才会把临时变量放到最外面啊？？？？？！！！@@#￥%……
+    integ_1=0;
+    integ_2=0;
     for nn=1:length(yi)
         integ1=integ1+weight3(nn)*(u_f(nn)-y_f(nn)).^2;  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
         integ2=integ2+weight3(nn)*u_f(nn).^2;
