@@ -1,4 +1,4 @@
-clear all; clc;  % clean the memory, screen, and figure
+clear; clc;  % clean the memory, screen, and figure
 
 % Problem definition
 f = @(x) -20*x.^3; % f(x) is the source
@@ -6,15 +6,15 @@ g = 1.0;           % u    = g  at x = 1
 h = 0.0;           % -u,x = h  at x = 0
 
 % Setup the mesh
-    err=zeros(8,2);        % 创建一个数列储存误差  %第二次天才
-    eh1=err;               % first order error
-    
+err=zeros(8,2);        % 创建一个数列储存误差  %第二次天才
+eh1=err;               % first order error
+
 for pp   = 2:3             % polynomial degree
     n_en = pp + 1;         % number of element or local nodes 3
     xx=zeros(8,1);          % ready for plot  in the loop
     yy=xx;
     yd=xx;
- n_el=2    % number of elements 使得函数hh从2到16循环
+    for n_el=2:2:16    % number of elements 使得函数hh从2到16循环
         n_np = n_el * pp + 1;  % number of nodal points  5
         n_eq = n_np - 1;       % number of equations  4
         n_int = 10;
@@ -49,14 +49,15 @@ for pp   = 2:3             % polynomial degree
             x_ele = x_coor(IEN(ee,:)); % x_ele(aa) = x_coor(A) with A = IEN(aa, ee)
 
             % quadrature loop
+            % 关于映射  首先映射到一个qua坐标系下，qua表示编号，而x_l表示的是新系，1 在新系下换元可以求导用于积分。
             for qua = 1 : n_int
                 dx_dxi = 0.0;
                 x_l = 0.0;
                 for aa = 1 : n_en
-                    x_l    = x_l    + x_ele(aa) * PolyShape(pp, aa, xi(qua), 0);
-                    dx_dxi = dx_dxi + x_ele(aa) * PolyShape(pp, aa, xi(qua), 1);
+                    x_l    = x_l    + x_ele(aa) * PolyShape(pp, aa, xi(qua), 0);% 可惜
+                    dx_dxi = dx_dxi + x_ele(aa) * PolyShape(pp, aa, xi(qua), 1);%d可惜dx
                 end
-                dxi_dx = 1.0 / dx_dxi;
+                dxi_dx = 1.0 / dx_dxi;%dxd可惜
 
                 for aa = 1 : n_en
                     f_ele(aa) = f_ele(aa) + weight(qua) * PolyShape(pp, aa, xi(qua), 0) * f(x_l) * dx_dxi;
@@ -143,46 +144,99 @@ for pp   = 2:3             % polynomial degree
         integ_2=0;
         %伪代码：首先已知节点精确，可用polyshape表示内部的点，得到高斯积分所需值，然后加权求和
         for mm=1:n_el %问题都在这段积分里
-            [ui, weight2] = Gauss(n_int, x_coor((mm-1)*pp+1), x_coor(mm*pp+1));%更换积分区间 一阶表示ui
             for ii=1:n_int  %小区间积分   已知节点处精确值，直接用权表示积分就行了，抄代码都抄不明白 重组
                 u_s=0;          %问题：已知三个节点处的精确解，但是高斯积分不会给出，需要转换后计算，参考课上给的代码
                 u_sd=0;
                 y_s=0;
                 y_sd=0;
-                uc=zeros(n_int,1);%存储积分所需高斯点
+                if mm == n_el
+            n_sam_end = n_sam+1;
+                 else
+            n_sam_end = n_sam;
+                end
+
+                uc=zeros(n_int,1);%存储积分所需高斯点  下面有取代
                 ucd=uc;
                 for aa = 1 : n_en%循环高斯得到值
-                    ee=pp*(mm-1)+aa;
-                    u_s = u_s + u_sam(ee) * PolyShape(pp, aa, ui(ii), 0);%积分所需u  数值积分有问题 修改为节点数值解
-                    u_sd = u_sd + ud_sam(aa) * PolyShape(pp, aa, ui(ii), 1);%这不是积分，是uh的值    怀疑polyshape部分出错
+                    % ee=pp*(mm-1)+aa; 不需要了
+                    u_s = u_s + u_sam(aa) * PolyShape(pp, aa, xi_sam(ii), 0);%积分所需u  数值积分有问题 修改为节点数值解   这里有问题，和想法不一样
+                    u_sd = u_sd + ud_sam(aa) * PolyShape(pp, aa, xi_sam(ii), 1);%这不是积分，是uh的值    怀疑polyshape部分出错  想想怎么表示
                 end                                                         %polyshape部分没错
-                u_c(ii)=u_s; %uh
-                u_cd(ii)=u_sd;%udh
+                u_c(ii)=u_s; %uh                            polyshape部分是表示用于节点处计算的，不是uh
+                u_cd(ii)=u_sd;%udh 
 
-                u_f(mm)=u_f(mm)+weight2(ii)*u_c(ii).^2;%这里才是积分 "节点精确"@@@@@@@
-                u_fd(mm)=u_fd(mm)+weight2(ii)*u_cd(ii).^2;
-                y_f(mm)=y_f(mm)+weight2(ii)*(u_c(ii)-ui(ii).^5).^2;
-                yd_f(mm)=yd_f(mm)+weight2(ii)*(u_cd(ii)-5*ui(ii).^4).^2;
+                u_f(mm)=u_f(mm)+weight(ii)*u_c(ii).^2;%这里才是积分 
+                u_fd(mm)=u_fd(mm)+weight(ii)*u_cd(ii).^2;
+                y_f(mm)=y_f(mm)+weight(ii)*(u_c(ii)-xi_sam(ii).^5).^2;
+                yd_f(mm)=yd_f(mm)+weight(ii)*(u_cd(ii)-5*xi_sam(ii).^4).^2;
             end
             integ1=integ1+u_f(mm);  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
-            integ2=integ2+u_fd(mm);
-            integ_1=integ_1+y_f(mm);
+            integ2=integ2+y_f(mm);
+            integ_1=integ_1+u_fd(mm);%使用y_sam和yd_sam直接得到积分
             integ_2=integ_2+yd_f(mm);
         end
+    %     for mm=1:n_el %问题都在这段积分里
+    % [ui, weight2] = Gauss(n_int, x_coor((mm-1)*pp+1), x_coor(mm*pp+1));%更换积分区间 一阶表示ui
+    % for ii=1:n_int  %小区间积分   已知节点处精确值，直接用权表示积分就行了，抄代码都抄不明白 重组
+    %     u_s=0;          %问题：已知三个节点处的精确解，但是高斯积分不会给出，需要转换后计算，参考课上给的代码
+    %     u_sd=0;
+    %     y_s=0;
+    %     y_sd=0;
+    %     if mm == n_el
+    %         n_sam_end = n_sam+1;
+    %     else
+    %         n_sam_end = n_sam;
+    %     end
+    % 
+    %     for ll = 1 : n_sam_end
+    %         x_l = 0.0;
+    %         u_l = 0.0;
+    %         u_sd=0;    %d means dot
+    %         for aa = 1 : n_en
+    %             x_l = x_l + x_ele(aa) * PolyShape(pp, aa, ui(ll), 0);%精确值*形函数
+    %             u_l = u_l + u_ele(aa) * PolyShape(pp, aa,ui(ll), 0);
+    %             u_sd = u_sd + u_ele(aa) * PolyShape(pp, aa, ui(ll), 1);
+    %         end
+    %         x_sam( (ee-1)*n_sam + ll ) = x_l;%coor
+    %         u_sam( (ee-1)*n_sam + ll ) = u_l;%uh
+    %         ud_sam(( (ee-1)*n_sam + ll ))=u_sd;%uh、
+    %         y_sam( (ee-1)*n_sam + ll ) = x_l^5;%y
+    %         yd_sam( (ee-1)*n_sam + ll ) =5*x_l^4;%yh、
+    %     end
+    %     %kexi的表示:  u_s = u_s + u_sam(ee) * PolyShape(pp, aa, ui(ii), 0)
+    %     %dxdkexi的表示：u_sd = u_sd + ud_sam(ee) * PolyShape(pp, aa, ui(ii), 1)
+    %     %integral : weight*u-y%dkexidx   % quadrature loop
+    %     for qua = 1 : n_int         %学习quardratic结果
+    %         dx_dxi = 0.0;
+    %         x_l = 0.0;
+    %         for aa = 1 : n_en
+    %             x_l    = x_l    + x_ele(aa) * PolyShape(pp, aa, xi(qua), 0);
+    %             dx_dxi = dx_dxi + x_ele(aa) * PolyShape(pp, aa, xi(qua), 1);%这是dxd可惜ok
+    %             dxi_dx = 1.0 / dx_dxi;
+    % 
+    %             for aa = 1 : n_el
+    %                 u_f(aa) = u_f(aa) + weight(qua) * (u_sam(aa)-y_sam(aa)).^2 * dx_dxi;
+    %                 u_fd(aa)=u_fd(aa)+weight(qua)*(ud_sam(aa)-yd_sam(aa)).^2*dx_dxi;
+    %                 y_f(aa)=y_f(aa)+weight(qua)*u_sam(aa).^2;
+    %                 yd_f(aa)=yd_f(aa)+weight(qua)*ud_sam(aa).^2;
+    %             end
+    %         end
+    %     end
         %得到x u u一阶导
-            %quardratic将积分弄出，最好是存到某一数组里面
-            %求和，利用quadratic把y弄出了，最后得到e
-            %待实现
+        %quardratic将积分弄出，最好是存到某一数组里面
+        %求和，利用quadratic把y弄出了，最后得到e
+        %待实现
         err(n_el/2,pp-1)=integ1/integ2;
         eh1(n_el/2,pp-1)=integ_1/integ_2;%
-        xx(n_el/2)=log(hh);
-        yy(n_el/2)=sqrt(log(err(n_el/2,pp-1)));
-        yd(n_el/2)=sqrt(log(eh1(n_el/2,pp-1)));
-
+        xx(n_el/2)=-log(hh);
+        yy(n_el/2)=sqrt(-log(err(n_el/2,pp-1)));
+        yd(n_el/2)=sqrt(-log(eh1(n_el/2,pp-1)));
+    end
         figure;
         plot(xx,yy, '-r','LineWidth',3);
         hold on;
         plot(xx,yd, '-k','LineWidth',3);%画出图像仍然有问题
+   
 end
 
 
