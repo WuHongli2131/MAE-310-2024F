@@ -4,17 +4,14 @@ clear all; clc;  % clean the memory, screen, and figure
 f = @(x) -20*x.^3; % f(x) is the source
 g = 1.0;           % u    = g  at x = 1
 h = 0.0;           % -u,x = h  at x = 0
-integ1=0;          %临时积分变量
-integ2=0;
-integ_1=0;
-integ_2=0;
+
 % Setup the mesh
 
 pp   = 2;              % polynomial degree
 n_en = pp + 1;         % number of element or local nodes 3
 err=zeros(8,1);        % 创建一个数列储存误差
 eh1=err;               % first order error
-for n_el = 2:2:16              % number of elements 使得函数hh从2到16循环
+for n_el=2:2:16      % number of elements 使得函数hh从2到16循环
     n_np = n_el * pp + 1;  % number of nodal points  5
     n_eq = n_np - 1;       % number of equations  4
     n_int = 10;
@@ -93,7 +90,6 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
 
     % Postprocessing: visualization
     %plot(x_coor, disp, '--r','LineWidth',3);
-
     %x_sam = 0 : 0.01 : 1;
     %y_sam = x_sam.^5;
     %hold on;
@@ -101,10 +97,10 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
 
     n_sam = 20;
     xi_sam = -1 : (2/n_sam) : 1;
-   
+
     x_sam = zeros(n_el * n_sam + 1, 1);% coordinate
     y_sam = x_sam; % store the exact solution value at sampling points
-    u_sam = x_sam; % store the numerical solution value at sampling pts
+    u_sa = x_sam; % store the numerical solution value at sampling pts
     ud_sam= x_sam;
     yd_sam= x_sam;
     for ee = 1 : n_el
@@ -120,32 +116,63 @@ for n_el = 2:2:16              % number of elements 使得函数hh从2到16循�
         for ll = 1 : n_sam_end
             x_l = 0.0;
             u_l = 0.0;
-            u_ld=0;    %d means dot
+            u_sd=0;    %d means dot
             for aa = 1 : n_en
                 x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
                 u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
-                u_ld = u_ld + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1);
+                u_sd = u_sd + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1);
             end
-
             x_sam( (ee-1)*n_sam + ll ) = x_l;
             u_sam( (ee-1)*n_sam + ll ) = u_l;
-            ud_sam(( (ee-1)*n_sam + ll ))=u_ld;
+            ud_sam(( (ee-1)*n_sam + ll ))=u_sd;
             y_sam( (ee-1)*n_sam + ll ) = x_l^5;
             yd_sam( (ee-1)*n_sam + ll ) =5*x_l^4;
         end
     end
-     [ui, weight2] = Gauss(n_el, -1, 1);
-    for nn=1:ui(n_el/2)     % calculate the integration
-        integ1=integ1+weight2(nn)*(u_sam(nn)-y_sam(nn)).^2;
-        integ2=integ2+weight2(nn)*u_sam(nn).^2;
-        integ_1=integ_1+weight2(nn)*(ud_sam(nn)-yd_sam(nn)).^2;
-        integ_2=integ_2+weight2(nn)*(ud_sam(nn)).^2;
+    % calculate the integration
+    u_f=zeros(n_el,1);
+    u_fd=u_f;%means final
+    y_f=u_f;
+    yd_f=u_f;
+    for mm=1:n_el
+        [ui, weight2] = Gauss(n_int, x_coor((mm-1)*pp+1), x_coor(mm*pp+1));%更换积分区间 一阶表示ui
+        x1sam=ui;
+        for ii=1:n_int  %小区间积分
+            u_s=0;
+            u_sd=0;
+            y_s=0;
+            y_sd=0;
+            for aa = 1 : n_en
+                u_s = u_s + ui(aa) * PolyShape(pp, aa, x1sam(ii), 0);%积分所需u
+                u_sd = u_sd + ui(aa) * PolyShape(pp, aa, x1sam(ii), 1);
+                y_s = y_s + ui(aa) * PolyShape(pp, aa, y_sam(ii), 0);%积分所需u
+                y_sd = y_sd + ui(aa) * PolyShape(pp, aa, yd_sam(ii), 1);
+            end
+            u_f(mm)=u_s;
+            u_fd(mm)=u_sd;
+            y_f(mm)=y_s;
+            y_fd(mm)=y_sd;
+        end             %得到x u u一阶导
+        %quardratic将积分弄出，最好是存到某一数组里面
+        %求和，利用quadratic把y弄出了，最后得到e
+        %待实现
     end
+    [yi,weight3]=Gauss(n_el, 0, 1);
+    integ1=0;          %临时积分变量
+    integ2=0; %什么天才会把临时变量放到最外面啊？？？？？！！！@@#￥%……
+    integ_1=0;
+    integ_2=0;
+    for nn=1:length(yi)
+        integ1=integ1+weight3(nn)*(u_f(nn)-y_f(nn)).^2;  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
+        integ2=integ2+weight3(nn)*u_f(nn).^2;
+        integ_1=integ_1+weight3(nn)*(u_fd(nn)-y_fd(nn)).^2;
+        integ_2=integ_2+weight3(nn)*(u_fd(nn)).^2;
+    end
+
     err(n_el/2)=integ1/integ2;
     eh1(n_el/2)=integ_1/integ_2;
 end
-
-
+%
 
 
 
