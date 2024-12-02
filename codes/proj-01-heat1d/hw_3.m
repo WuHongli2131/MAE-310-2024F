@@ -125,11 +125,11 @@ for pp   = 2:3             % polynomial degree
                     u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
                     u_sd = u_sd + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1);
                 end
-                x_sam( (ee-1)*n_sam + ll ) = x_l;
-                u_sam( (ee-1)*n_sam + ll ) = u_l;
-                ud_sam(( (ee-1)*n_sam + ll ))=u_sd;
-                y_sam( (ee-1)*n_sam + ll ) = x_l^5;
-                yd_sam( (ee-1)*n_sam + ll ) =5*x_l^4;
+                x_sam( (ee-1)*n_sam + ll ) = x_l;%coor
+                u_sam( (ee-1)*n_sam + ll ) = u_l;%uh
+                ud_sam(( (ee-1)*n_sam + ll ))=u_sd;%uh、
+                y_sam( (ee-1)*n_sam + ll ) = x_l^5;%y
+                yd_sam( (ee-1)*n_sam + ll ) =5*x_l^4;%yh、
             end
         end
         % calculate the integration
@@ -148,7 +148,7 @@ for pp   = 2:3             % polynomial degree
                 for aa = 1 : n_en
                     u_s = u_s + ui(aa) * PolyShape(pp, aa, x1sam(ii), 0);%积分所需u
                     u_sd = u_sd + ui(aa) * PolyShape(pp, aa, x1sam(ii), 1);
-                    y_s = y_s + ui(aa) * PolyShape(pp, aa, y_sam(ii), 0);%积分所需u
+                    y_s = y_s + ui(aa) * PolyShape(pp, aa, y_sam(ii), 0);%积分所需y
                     y_sd = y_sd + ui(aa) * PolyShape(pp, aa, yd_sam(ii), 1);
                 end
                 u_f(mm)=u_s;
@@ -174,14 +174,14 @@ for pp   = 2:3             % polynomial degree
 
         err(n_el/2,pp-1)=integ1/integ2;
         eh1(n_el/2,pp-1)=integ_1/integ_2;%
-        xx(n_el/2)=log(hh);
-        yy(n_el/2)=sqrt(err(n_el/2,pp-1));
-        yd(n_el/2)=sqrt(eh1(n_el/2,pp-1));
+        xx(n_el/2)=-log(hh);
+        yy(n_el/2)=sqrt(-log(err(n_el/2,pp-1)));
+        yd(n_el/2)=sqrt(-log(eh1(n_el/2,pp-1)));
     end
         figure;
         plot(xx,yy, '-r','LineWidth',3);
         hold on;
-        plot(xx,yd, '-k','LineWidth',3);
+        plot(xx,yd, '-k','LineWidth',3);%画出图像仍然有问题
 end
 
 
