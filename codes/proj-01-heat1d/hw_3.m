@@ -121,7 +121,7 @@ for pp   = 2:3             % polynomial degree
                 u_l = 0.0;
                 u_sd=0;    %d means dot
                 for aa = 1 : n_en
-                    x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
+                    x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);%精确值*形函数
                     u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
                     u_sd = u_sd + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1);
                 end
@@ -137,29 +137,36 @@ for pp   = 2:3             % polynomial degree
         u_fd=u_f;%means final
         y_f=u_f;
         yd_f=u_f;
-        for mm=1:n_el
+        
+        %伪代码：首先已知节点精确，可用polyshape表示内部的点，得到高斯积分所需值，然后加权求和
+        for mm=1:n_el %问题都在这段积分里
             [ui, weight2] = Gauss(n_int, x_coor((mm-1)*pp+1), x_coor(mm*pp+1));%更换积分区间 一阶表示ui
-            x1sam=ui;
-            for ii=1:n_int  %小区间积分
-                u_s=0;
+            for ii=1:n_int  %小区间积分   已知节点处精确值，直接用权表示积分就行了，抄代码都抄不明白 重组
+                u_s=0;          %问题：已知三个节点处的精确解，但是高斯积分不会给出，需要转换后计算，参考课上给的代码
                 u_sd=0;
-                y_s=0;
+                y_s=0;              
                 y_sd=0;
-                for aa = 1 : n_en
-                    u_s = u_s + ui(aa) * PolyShape(pp, aa, x1sam(ii), 0);%积分所需u
-                    u_sd = u_sd + ui(aa) * PolyShape(pp, aa, x1sam(ii), 1);
-                    y_s = y_s + ui(aa) * PolyShape(pp, aa, y_sam(ii), 0);%积分所需y
-                    y_sd = y_sd + ui(aa) * PolyShape(pp, aa, yd_sam(ii), 1);
+                uc=zeros(n_int,1);%存储积分所需高斯点
+                ucd=uc;
+                for aa = 1 : n_en%循环高斯得到值
+                    ee=pp*(mm-1)+aa;
+                    u_s = u_s + u_sam(ee) * PolyShape(pp, aa, ui(ii), 0);%积分所需u  数值积分有问题 修改为节点数值解
+                    u_sd = u_sd + ud_sam(aa) * PolyShape(pp, aa, ui(ii), 1);%这不是积分，是uh的值
+                    y_s = y_s + y_sam(aa) * PolyShape(pp, aa,ui(ii), 0);%积分所需y  这里没必要留
+                    y_sd = y_sd + yd_sam(aa) * PolyShape(pp, aa, ui(ii), 1);
                 end
-                u_f(mm)=u_s;
-                u_fd(mm)=u_sd;
-                y_f(mm)=y_s;
-                y_fd(mm)=y_sd;
-            end             %得到x u u一阶导
+                u_c(ii)=u_s;
+                u_cd(ii)=u_sd;
+                y_f(ii)=y_s;
+                y_fd(ii)=y_sd;
+                u_f(mm)=u_f(mm)+weight2(ii)*uc(ii);%这里才是积分
+            end  
+            
+        end
+        %得到x u u一阶导
             %quardratic将积分弄出，最好是存到某一数组里面
             %求和，利用quadratic把y弄出了，最后得到e
             %待实现
-        end
         [yi,weight3]=Gauss(n_el, 0, 1);
         integ1=0;          %临时积分变量
         integ2=0;           %什么天才会把临时变量放到最外面啊？？？？？！！！@@#￥%……
@@ -174,9 +181,9 @@ for pp   = 2:3             % polynomial degree
 
         err(n_el/2,pp-1)=integ1/integ2;
         eh1(n_el/2,pp-1)=integ_1/integ_2;%
-        xx(n_el/2)=-log(hh);
-        yy(n_el/2)=sqrt(-log(err(n_el/2,pp-1)));
-        yd(n_el/2)=sqrt(-log(eh1(n_el/2,pp-1)));
+        xx(n_el/2)=log(hh);
+        yy(n_el/2)=sqrt(log(err(n_el/2,pp-1)));
+        yd(n_el/2)=sqrt(log(eh1(n_el/2,pp-1)));
     end
         figure;
         plot(xx,yy, '-r','LineWidth',3);
