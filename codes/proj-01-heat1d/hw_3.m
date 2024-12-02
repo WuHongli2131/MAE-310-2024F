@@ -152,14 +152,14 @@ for pp   = 2:3             % polynomial degree
                     ee=pp*(mm-1)+aa;
                     u_s = u_s + u_sam(ee) * PolyShape(pp, aa, ui(ii), 0);%积分所需u  数值积分有问题 修改为节点数值解
                     u_sd = u_sd + ud_sam(aa) * PolyShape(pp, aa, ui(ii), 1);%这不是积分，是uh的值
-                    y_s = y_s + y_sam(aa) * PolyShape(pp, aa,ui(ii), 0);%积分所需y  这里没必要留
-                    y_sd = y_sd + yd_sam(aa) * PolyShape(pp, aa, ui(ii), 1);
                 end
                 u_c(ii)=u_s;
                 u_cd(ii)=u_sd;
-                y_f(ii)=y_s;
-                y_fd(ii)=y_sd;
-                u_f(mm)=u_f(mm)+weight2(ii)*uc(ii);%这里才是积分
+                u_f(mm)=u_f(mm)+weight2(ii)*u_c(ii);%这里才是积分
+                u_fd(mm)=u_fd(mm)+weight2(ii)*u_cd(ii);
+                y_f(mm)= y_f(mm)+weight2(ii)*ui(ii).^5;
+                yd_f(mm)= yd_f(mm)+5*weight2(ii)*ui(ii).^4;
+
             end  
             
         end
@@ -175,7 +175,7 @@ for pp   = 2:3             % polynomial degree
         for nn=1:length(yi)
             integ1=integ1+weight3(nn)*(u_f(nn)-y_f(nn)).^2;  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
             integ2=integ2+weight3(nn)*u_f(nn).^2;
-            integ_1=integ_1+weight3(nn)*(u_fd(nn)-y_fd(nn)).^2;
+            integ_1=integ_1+weight3(nn)*(u_fd(nn)-yd_f(nn)).^2;
             integ_2=integ_2+weight3(nn)*(u_fd(nn)).^2;
         end
 
