@@ -144,15 +144,13 @@ for pp   = 2:3             % polynomial degree
             for ii=1:n_int  %小区间积分   已知节点处精确值，直接用权表示积分就行了，抄代码都抄不明白 重组
                 u_s=0;          %问题：已知三个节点处的精确解，但是高斯积分不会给出，需要转换后计算，参考课上给的代码
                 u_sd=0;
-                y_s=0;              
-                y_sd=0;
                 uc=zeros(n_int,1);%存储积分所需高斯点
                 ucd=uc;
                 for aa = 1 : n_en%循环高斯得到值
                     ee=pp*(mm-1)+aa;
                     u_s = u_s + u_sam(ee) * PolyShape(pp, aa, ui(ii), 0);%积分所需u  数值积分有问题 修改为节点数值解
-                    u_sd = u_sd + ud_sam(aa) * PolyShape(pp, aa, ui(ii), 1);%这不是积分，是uh的值
-                end
+                    u_sd = u_sd + ud_sam(aa) * PolyShape(pp, aa, ui(ii), 1);%这不是积分，是uh的值    怀疑polyshape部分出错
+                end                                                         %polyshape部分没错
                 u_c(ii)=u_s;
                 u_cd(ii)=u_sd;
                 u_f(mm)=u_f(mm)+weight2(ii)*u_c(ii);%这里才是积分
@@ -172,7 +170,7 @@ for pp   = 2:3             % polynomial degree
         integ2=0;           %什么天才会把临时变量放到最外面啊？？？？？！！！@@#￥%……
         integ_1=0;
         integ_2=0;
-        for nn=1:length(yi)
+        for nn=1:length(yi)  %既然上面是积分，那这里是？
             integ1=integ1+weight3(nn)*(u_f(nn)-y_f(nn)).^2;  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
             integ2=integ2+weight3(nn)*u_f(nn).^2;
             integ_1=integ_1+weight3(nn)*(u_fd(nn)-yd_f(nn)).^2;
