@@ -1,5 +1,5 @@
 clear; clc;  % clean the memory, screen, and figure
-
+%观察到在选取的节点是1和2时，得到的图像分别是空和水平线，之后才是逐渐贴合hw3中的直线的图，可以验证p191的理论
 % Problem definition
 f = @(x) -20*x.^3; % f(x) is the source
 g = 1.0;           % u    = g  at x = 1
