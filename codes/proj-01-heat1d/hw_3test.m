@@ -167,8 +167,8 @@ for pp   = 2:3             % polynomial degree
 
                 u_f(mm)=u_f(mm)+weight(ii)*u_c(ii).^2;%这里才是积分 
                 u_fd(mm)=u_fd(mm)+weight(ii)*u_cd(ii).^2;
-                y_f(mm)=y_f(mm)+weight(ii)*(u_c(ii)-xi_sam(ii).^5).^2;
-                yd_f(mm)=yd_f(mm)+weight(ii)*(u_cd(ii)-5*xi_sam(ii).^4).^2;
+                y_f(mm)=y_f(mm)+weight(ii)*(u_c(ii)-y_sam(ii)).^2;
+                yd_f(mm)=yd_f(mm)+weight(ii)*(u_cd(ii)-yd_sam(ii)).^2;
             end
             integ1=integ1+u_f(mm);  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
             integ2=integ2+y_f(mm);
@@ -226,11 +226,11 @@ for pp   = 2:3             % polynomial degree
         %quardratic将积分弄出，最好是存到某一数组里面
         %求和，利用quadratic把y弄出了，最后得到e
         %待实现
-        err(n_el/2,pp-1)=integ1/integ2;
-        eh1(n_el/2,pp-1)=integ_1/integ_2;%
-        xx(n_el/2)=-log(hh);
-        yy(n_el/2)=sqrt(-log(err(n_el/2,pp-1)));
-        yd(n_el/2)=sqrt(-log(eh1(n_el/2,pp-1)));
+        err(n_el/2,pp-1)=sqrt(integ2)/sqrt(integ1);
+        eh1(n_el/2,pp-1)=sqrt(integ_2)/sqrt(integ_1);%
+        xx(n_el/2)=log(hh);
+        yy(n_el/2)=log(err(n_el/2,pp-1));
+        yd(n_el/2)=log(eh1(n_el/2,pp-1));
     end
         figure;
         plot(xx,yy, '-r','LineWidth',3);
