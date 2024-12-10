@@ -144,41 +144,41 @@ for pp   = 2:2            % polynomial degree
         integ_1=0;
         integ_2=0;
         %伪代码：首先已知节点精确，可用polyshape表示内部的点，得到高斯积分所需值，然后加权求和
+
         for mm=1:n_el %问题都在这段积分里
-            x_ele = x_coor( IEN(mm, :) );
-            u_ele = disp( IEN(mm, :) );%u在结点处不精确
+            %u在结点处不精确
              xh=zeros(n_int,1);
              uh=xh;
              uhd=xh;
-            for qua = 1 : n_int         %学习quardratic结果
+            for qua = 1 : n_el         %学习quardratic结果
                 dx_dxi = 0.0;
                 x_l = 0.0;
                 u_s=0;
                 u_sd=0;
                
-                for aa = 1 : n_en
-                    x_l    = x_l    + x_ele(aa) * PolyShape(pp, aa, xi(qua), 0);
-                    u_s     = u_s     + u_ele(aa) * PolyShape(pp, aa, xi(qua), 0);
-                    dx_dxi = dx_dxi + x_ele(aa) * PolyShape(pp, aa, xi(qua), 1);%这是dxd可惜ok
-                    u_sd  = u_sd  + u_ele(aa) * PolyShape(pp, aa, xi(qua), 1);
+                for aa = 1 : n_en%得到quadratic点处所需的uh值   %这里积分异常
+                    x_l    = x_l + x_sam(aa) * PolyShape(pp, aa, xi(qua), 0);
+                    u_s   = u_s+ u_sam(aa) * PolyShape(pp, aa, xi(qua), 0);
+                    dx_dxi = dx_dxi + x_sam(aa) * PolyShape(pp, aa, xi(qua), 1);%这是dxd可惜ok
+                    u_sd  = u_sd  + u_sam(aa) * PolyShape(pp, aa, xi(qua), 1);
                 end
                 dxi_dx = 1.0 / dx_dxi;
-                xh(qua)=x_l;
+                xh(qua)=x_l;%记录quardradic  这里已经是节点精确值了
                 uh(qua)=u_s;
                 uhd(qua)=u_sd;
-                u_f(mm) = u_f(mm) + weight(qua) * (uh(qua)-xh(qua).^5).^2 * dx_dxi;%容易出错的循环嵌套
-                u_fd(mm)=u_fd(mm)+weight(qua)*(uhd(qua)-5*xh(qua).^4).^2*dx_dxi;
-                y_f(mm)=y_f(mm)+weight(qua)*uh(qua).^2*dx_dxi;
-                yd_f(mm)=yd_f(mm)+weight(qua)*uhd(qua).^2*dx_dxi;
-            end
+                % u_f(mm) = u_f(mm) + weight(qua) * (uh(qua)-xh(qua).^5).^2 * dx_dxi;%容易出错的循环嵌套
+                % u_fd(mm)=u_fd(mm)+weight(qua)*(uhd(qua)-5*xh(qua).^4).^2*dx_dxi;%相当于积分 次数是nel次加权求和
+                % y_f(mm)=y_f(mm)+weight(qua)*uh(qua).^2*dx_dxi;
+                % yd_f(mm)=yd_f(mm)+weight(qua)*uhd(qua).^2*dx_dxi;
+            end%循环出来后u_f（mm）操作有问题
             
-                integ1=integ1+u_f(mm);  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
-                integ2=integ2+y_f(mm);
-                integ_1=integ_1+u_fd(mm);%使用y_sam和yd_sam直接得到积分
-                integ_2=integ_2+yd_f(mm);
+                integ1=integ1+weight(qua) * (uh(qua)-xh(qua).^5).^2;  %发现bug，nn含义不同，导致积分点选错  需要用nn表示ui（找不到明显规律）
+                integ2=integ2+weight(qua)*(uhd(qua)-5*xh(qua).^4).^2*dx_dxi;
+                integ_1=integ_1+weight(qua)*uh(qua).^2*dx_dxi;%使用y_sam和yd_sam直接得到积分
+                integ_2= integ_2+weight(qua)*uhd(qua).^2*dx_dxi;
         end
-            err(n_el/2,pp-1)=sqrt(integ2)/sqrt(integ1);
-            eh1(n_el/2,pp-1)=sqrt(integ_2)/sqrt(integ_1);%
+            err(n_el/2,pp-1)=sqrt(integ_1)/sqrt(integ1);
+            eh1(n_el/2,pp-1)=sqrt(integ_2)/sqrt(integ2);%
             xx(n_el/2)=log(hh);
             yy(n_el/2)=log(err(n_el/2,pp-1));
             yd(n_el/2)=log(eh1(n_el/2,pp-1));
