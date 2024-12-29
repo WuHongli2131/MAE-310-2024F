@@ -18,8 +18,8 @@ n_int     = n_int_xi * n_int_eta;
 
 % mesh generation
 n_en   = 3;               % number of nodes in an element  %3个节点
-n_el_x = 60;               % number of elements in x-dir 划分单元格
-n_el_y = 60;               % number of elements in y-dir
+n_el_x = 6;               % number of elements in x-dir 划分单元格 误差修改这里以修改h
+n_el_y = 6;               % number of elements in y-dir
 n_el   =2* n_el_x * n_el_y; % total number of elements  总单元数  三角形中*2
 
 n_np_x = n_el_x + 1;      % number of nodal points in x-dir  节点数
@@ -29,7 +29,7 @@ n_np   = n_np_x * n_np_y; % total number of nodal points 总节点数
 x_coor = zeros(n_np, 1);  %坐标 两者相同   划分为三角形时 每个矩形被划分为两个三角形 于是 n_el翻倍 
 y_coor = x_coor;            %但是n_np不变
 
-hx = 1.0 / n_el_x;        % mesh size in x-dir  在三角形中hx需要*2
+hx = 1.0 / n_el_x;        % mesh size in x-dir  在三角形中hx需要*2 这里不用×2，因为网格只是被分成两部分，没有被改变
 hy = 1.0 / n_el_y;        % mesh size in y-dir
 
 % generate the nodal coordinates
@@ -158,4 +158,11 @@ end
 save("HEAT", "disp", "n_el_x", "n_el_y");%为了proj做准备
 
 % EOF
-%第一遍结果貌似有bug 出来和原来的图像不一致
+%第一遍结果貌似有bug 出来和原来的图像不一致 
+
+%%下面是关于err的代码
+%从书上了解到err应该满足一个关系，在三角形中形函数的k=1，m=1或0 k+1-m=2或1
+%m=0时应该是h^2关系， m=1时应该是h的关系取log看斜率即可
+%需要积分uh-u的平方 总之前面积分部分没有问题，新开一个积分式子就行了
+%具体动手写，你也是个天才，神特么用键盘推积分公式
+%
