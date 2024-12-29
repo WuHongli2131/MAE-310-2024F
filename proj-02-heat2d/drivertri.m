@@ -11,15 +11,20 @@ exact_y = @(x,y) x*(1-x)*(1-2*y);
 f = @(x,y) 2.0*kappa*x*(1-x) + 2.0*kappa*y*(1-y); % source term
 
 % quadrature rule
-n_int_xi  = 3;
-n_int_eta = 3;
+n_int_xi  = 60;
+n_int_eta = 60;
 n_int     = n_int_xi * n_int_eta;
 [xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta);%尝试修改 GAUSS 切换后生成高斯网格
 
 % mesh generation
-n_en   = 3;               % number of nodes in an element  %3个节点
-n_el_x = 6;               % number of elements in x-dir 划分单元格 误差修改这里以修改h
-n_el_y = 6;               % number of elements in y-dir
+n_en   = 3;% number of nodes in an element  %3个节点
+xx=zeros(6,1);
+yy=xx;
+yd=xx;
+i=0;
+for n_el_x = 1:6       % number of elements in x-dir 划分单元格 误差修改这里以修改h
+    i=i+1;
+ n_el_y = n_el_x;               % number of elements in y-dir
 n_el   =2* n_el_x * n_el_y; % total number of elements  总单元数  三角形中*2
 
 n_np_x = n_el_x + 1;      % number of nodal points in x-dir  节点数
@@ -151,9 +156,7 @@ for ii = 1 : n_np
   else
     % modify disp with the g data. Here it does nothing because g is zero   
   end
-end
-
-% save the solution vector and number of elements to disp with name
+end% save the solution vector and number of elements to disp with name
 % HEAT.mat
 save("HEAT", "disp", "n_el_x", "n_el_y");%为了proj做准备
 
@@ -165,4 +168,65 @@ save("HEAT", "disp", "n_el_x", "n_el_y");%为了proj做准备
 %m=0时应该是h^2关系， m=1时应该是h的关系取log看斜率即可
 %需要积分uh-u的平方 总之前面积分部分没有问题，新开一个积分式子就行了
 %具体动手写，你也是个天才，神特么用键盘推积分公式
-%
+%最后推出来发现行列式在笔记本上 服了
+el2=0;
+eh1=0;
+for ee = 1 : n_el   %单元内划分
+  x_ele = x_coor( IEN(ee, 1:n_en) );%节点内编号
+  y_ele = y_coor( IEN(ee, 1:n_en) );%这里需要积分所在的精确的节点值
+%有disp，需要将disp和uh的单元对应起来   1：128 2：298 3：239 IEN阵
+  uhp=disp(IEN(ee,:));%系数和节点对应起来
+  for ll = 1 : n_int  %开始积分 重复上述，大部分不用改
+    x_l = 0.0; y_l = 0.0;
+    dx_dxi = 0.0; dx_deta = 0.0;%xi表示可惜 eta表示伊塔 用于处理链式法则
+    dy_dxi = 0.0; dy_deta = 0.0;
+    for aa = 1 : n_en
+      x_l = x_l + x_ele(aa) * Quadtri(aa, xi(ll), eta(ll)); %取单个节点进行拟合
+      y_l = y_l + y_ele(aa) * Quadtri(aa, xi(ll), eta(ll));    
+      [Na_xi, Na_eta] = Quadtri_grad(aa, xi(ll), eta(ll));%一阶导拟合
+      dx_dxi  = dx_dxi  + x_ele(aa) * Na_xi;%单节点的导数一起处理了
+      dx_deta = dx_deta + x_ele(aa) * Na_eta;
+      dy_dxi  = dy_dxi  + y_ele(aa) * Na_xi;
+      dy_deta = dy_deta + y_ele(aa) * Na_eta;
+    end
+    
+    detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;%雅可比行列式  到这里都没问题
+    uh=0; uh_x=0;uh_y=0;
+    for aa = 1 : n_en%我又得去看书了，忘记原始公式了 拟合的准则似乎没变 变得只有形函数
+      Na = Quad(aa, xi(ll), eta(ll));
+      [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+      Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
+      Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
+      % 这里不用b，只用计算一次积分
+      % f_ele(aa) = f_ele(aa) + weight(ll) * detJ * f(x_l, y_l) * Na;
+      % 
+      % for bb = 1 : n_en
+      %   Nb = Quad(bb, xi(ll), eta(ll));
+      %   [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
+      %   Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
+      %   Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
+      % 
+      %   k_ele(aa, bb) = k_ele(aa,bb) + weight(ll) * detJ * kappa * (Na_x * Nb_x + Na_y * Nb_y);
+      % 
+      % end % end of bb loop
+       uh=uh+uhp(aa)*Na;
+       uh_x=uh_x+uhp(aa)*Na_x;
+       uh_y=uh_y+uhp(aa)*Na_y;
+      %计算uh
+    end % end of aa loop
+    %到这里暂存了uh uh_x和uh_y   并且在quadrature rule 内部 这里完成积分
+    e=uh-exact(x_l,y_l);
+    e_x=uh_x-exact_x(x_l,y_l);
+    e_y=uh_y-exact_y(x_l,y_l);
+    el2=el2+weight(ll)*detJ*(e^2);
+    eh1=eh1+weight(ll)*detJ*(e_x^2+e_y^2);
+  end % end of quadrature loop
+end
+yy(i)=el2;
+yd(i)=eh1;
+xx(i)=hx;
+end
+figure;
+plot(log(xx), log(yy), '-r','LineWidth',3);%出来函数图像很奇怪 不知道哪里出问题 拟合结果为4和3
+hold on;
+plot(log(xx),log(yd));
