@@ -29,8 +29,8 @@ n_np   = n_np_x * n_np_y; % total number of nodal points 总节点数
 x_coor = zeros(n_np, 1);  %坐标 两者相同   划分为三角形时 每个矩形被划分为两个三角形 于是 n_el翻倍 
 y_coor = x_coor;            %但是n_np不变
 
-hx = 2.0 / n_el_x;        % mesh size in x-dir  在三角形中hx需要*2
-hy = 2.0 / n_el_y;        % mesh size in y-dir
+hx = 1.0 / n_el_x;        % mesh size in x-dir  在三角形中hx需要*2
+hy = 1.0 / n_el_y;        % mesh size in y-dir
 
 % generate the nodal coordinates
 for ny = 1 : n_np_y
