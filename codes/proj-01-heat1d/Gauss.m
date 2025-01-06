@@ -54,3 +54,4 @@ x=(a*(1-y)+b*(1+y))/2;
      
 % Compute the weights
 w=(b-a)./((1-y.^2).*Lp.^2)*(N2/N1)^2;
+

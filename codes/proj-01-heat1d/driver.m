@@ -7,10 +7,10 @@ h = 0.0;           % -u,x = h  at x = 0
 
 % Setup the mesh
 pp   = 2;              % polynomial degree
-n_en = pp + 1;         % number of element or local nodes
+n_en = pp + 1;         % number of element or local nodes 3
 n_el = 2;              % number of elements
-n_np = n_el * pp + 1;  % number of nodal points
-n_eq = n_np - 1;       % number of equations
+n_np = n_el * pp + 1;  % number of nodal points  5
+n_eq = n_np - 1;       % number of equations  4
 n_int = 10;
 
 hh = 1.0 / (n_np - 1); % space between two adjacent nodes
@@ -32,7 +32,7 @@ ID(end) = 0;
 [xi, weight] = Gauss(n_int, -1, 1);
 
 % allocate the stiffness matrix
-K = spalloc(n_eq, n_eq, (2*pp+1)*n_eq);
+K = spalloc(n_eq, n_eq, (2*pp+1)*n_eq);% 快速三角阵
 F = zeros(n_eq, 1);
 
 % Assembly of the stiffness matrix and load vector
@@ -48,8 +48,7 @@ for ee = 1 : n_el
     x_l = 0.0;
     for aa = 1 : n_en
       x_l    = x_l    + x_ele(aa) * PolyShape(pp, aa, xi(qua), 0);
-      dx_dxi = dx_dxi + x_ele(aa) * PolyShape(pp, aa, xi(qua), 1);
-    end
+      dx_dxi = dx_dxi + x_ele(aa) * PolyShape(pp, aa, xi(qua), 1);%这是dxd可惜ok
     dxi_dx = 1.0 / dx_dxi;
 
     for aa = 1 : n_en
