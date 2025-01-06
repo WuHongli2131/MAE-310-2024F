@@ -11,18 +11,16 @@ exact_y = @(x,y) x*(1-x)*(1-2*y);
 f = @(x,y) 2.0*kappa*x*(1-x) + 2.0*kappa*y*(1-y); % source term
 
 % quadrature rule
-n_int_xi  = 30;
-n_int_eta = 30;
-n_int     = n_int_xi * n_int_eta;
-[xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta);%尝试修改 GAUSS 切换后生成高斯网格
+n_int= 6;
+[xi, eta, weight] = Gauss2Dtri(n_int);%尝试修改 GAUSS 切换后生成高斯网格
 
 % mesh generation
-n_en   = 3;% number of nodes in an element  %3个节点
+n_en= 3;% number of nodes in an element  %3个节点
 xx=zeros(7,1);
 yy=xx;
 yd=xx;
 i=0;
-for n_el_x = 2:8    % number of elements in x-dir 划分单元格 误差修改这里以修改h
+for n_el_x = 2:2:14    % number of elements in x-dir 划分单元格 误差修改这里以修改h
     i=i+1;
     n_el_y = n_el_x;               % number of elements in y-dir
     n_el   =2* n_el_x * n_el_y; % total number of elements  总单元数  三角形中*2
@@ -106,16 +104,16 @@ for n_el_x = 2:8    % number of elements in x-dir 划分单元格 误差修改�
             detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;%雅可比行列式  到这里都没问题
 
             for aa = 1 : n_en%我又得去看书了，忘记原始公式了 拟合的准则似乎没变 变得只有形函数
-                Na = Quad(aa, xi(ll), eta(ll));
-                [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+                Na = Quadtri(aa, xi(ll), eta(ll));
+                [Na_xi, Na_eta] = Quadtri_grad(aa, xi(ll), eta(ll));
                 Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
                 Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
 
                 f_ele(aa) = f_ele(aa) + weight(ll) * detJ * f(x_l, y_l) * Na;
 
                 for bb = 1 : n_en
-                    Nb = Quad(bb, xi(ll), eta(ll));
-                    [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
+                    Nb = Quadtri(bb, xi(ll), eta(ll));
+                    [Nb_xi, Nb_eta] = Quadtri_grad(bb, xi(ll), eta(ll));
                     Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
                     Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
 
