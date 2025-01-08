@@ -1,26 +1,25 @@
 %2D
 clear all; clc;
 %%整体思路：利用一个逻辑值来控制当前反向，然后在当前方向视为一个自由度二维问题，解出来后循环到下一个自由度，最后拼起来即可（当前版本不考虑3维）
+%由于耦合，上述思路放弃了，转为直接使用书上思路
 %%参数导入   需要用户修改的部分
-kappa = 1.0; % conductivity 修改为mu和lamda
-mu=1;
-lamda=1;%具体数值需要修改对比
+
+E=1;%表示模量
+mu=0.3;%泊松比
+coe=E/(1-mu);%表系数
 D = zeros(3);%D阵一步到胃
-D(1,1)=2*mu+lamda;
-D(2,2)=D(1,1);
-D(1,2)=lamda;
-D(2,1)=D(1,2);
-D(3,3)=mu;
+D(1,1)=coe;D(2,2)=D(1,1);D(1,2)=coe*-mu;D(2,1)=D(1,2);D(3,3)=coe*(1-mu)/2;
 %%检验方程
 % exact solution
+dof=2;%自由度
 dir=1;
-v_x=0;%没算出来 先确定第一个方向再说
+v_x=0;%
 v_y=0;
 exact = @(x,y) (dir==1)*x*(1-x)*y*(1-y)+(dir==2)*x*(1-x)*y*(1-y);%dir表示当前方向，在前方加入循环即可将代码实现多次计算
 exact_x = @(x,y) (dir==1)*(1-2*x)*y*(1-y)+(dir==2)*v_x;
 exact_y = @(x,y) (dir==1)*x*(1-x)*(1-2*y)+(dir==2)*v_y;
-
-f = @(x,y) 2.0*kappa*x*(1-x) + 2.0*kappa*y*(1-y); % source term
+fy=0;
+f = @(x,y,d) (d==1)*2.0*kappa*x*(1-x) + 2.0*kappa*y*(1-y)+(d==2)*fy; % source term
 
 %%四边形quadrature rule部分
 % quadrature rule
@@ -58,7 +57,7 @@ end
 
 %%IEN部分 这里可以加一个判断 跳过重新生成Ien
 % IEN array
-if dir==1  %仅在第一次生成IEN，否则后续的IEN会覆盖掉前面的IEN
+
 IEN = zeros(n_el, n_en); %element和其所连接的点的关系
 for ex = 1 : n_el_x
   for ey = 1 : n_el_y
@@ -84,8 +83,7 @@ end
 n_eq = counter;%计算内部网格
 
 LM = ID(IEN);%略显抽象，只知道结果是把方程映射到了节点上
-else
-end
+
 
 
 %%k阵和f阵建立 
@@ -96,7 +94,7 @@ F = zeros(n_eq, 1);
 %在这里理清一下思路 使用BDB矩阵表示K
 %需要B阵，并且B阵与a和b无关
 %需要向量e，不与a和b有关 和方向有关 脑子晕了这里   与i和j有关
-%于是在一个单元内，定义出BDB 然后再与eiej循环？ 但是和Kele的关系？
+%于是在一个单元内，定义出BDB 然后再与eiej循环？ 但是和Kele的关系？  Dij和eij绑定
 %需要D阵，已定义
 
 % loop over element to assembly the matrix and vector
@@ -131,42 +129,49 @@ for ee = 1 : n_el
     end
     
     detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;%雅可比行列式
-    
+    %因为可能要改三维。。这里ij写成循环形式
+    for i=1:dof
+        ei=(i==1)*[1,0]+(i==2)*[0,1];%还挺好用的这方式
     for aa = 1 : n_en%我又得去看书了，忘记原始公式了
       Na = Quad(aa, xi(ll), eta(ll));
       [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
       Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
       Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
-      
-      f_ele(aa) = f_ele(aa) + weight(ll) * detJ * f(x_l, y_l) * Na;%需要修改 似乎不用，i和j表示方向后就是看dir 但是两个方向是分开的 只需要最后存储的时候注意就可以了
-      
+      PP=dof*(aa-1)+i;
+      F(PP) = f(PP) + weight(ll) * detJ * f(x_l, y_l,i) * Na;%需要修改 似乎不用，i和j表示方向后就是看dir 但是两个方向是分开的 只需要最后存储的时候注意就可以了
+      for j=1:dof
+          ej=(j==1)*[1,0]+(j==2)*[0,1];
       for bb = 1 : n_en
+         QQ=dof*(bb-1)+j;
         Nb = Quad(bb, xi(ll), eta(ll));
         [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
         Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
         Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
         
-        k_ele(aa, bb) = k_ele(aa,bb) + weight(ll) * detJ * kappa * (Na_x * Nb_x + Na_y * Nb_y);%需要修改
+        K(PP,QQ) = K(PP,QQ) + weight(ll) * detJ *ei'*Blb'*D*Blb*ej;%需要修改
+      end
       end % end of bb loop
     end % end of aa loop
   end % end of quadrature loop
- 
-  for aa = 1 : n_en
-    PP = LM(ee, aa);
-    if PP > 0
-      F(PP) = F(PP) + f_ele(aa);%算了不管了，反正我得到了K阵和F阵
-      
-      for bb = 1 : n_en
-        QQ = LM(ee, bb);
-        if QQ > 0
-          K(PP, QQ) = K(PP, QQ) + k_ele(aa, bb);
-        else
-          % modify F with the boundary data
-          % here we do nothing because the boundary data g is zero or
-          % homogeneous
-        end
-      end  
-    end
+ %下面一段是原来ele和F的对应式子
+
+  % for aa = 1 : n_en
+  %   PP = LM(ee, aa);
+  %   if PP > 0
+  %     F(PP) = F(PP) + f_ele(aa);%算了不管了，反正我得到了K阵和F阵
+  % 
+  %     for bb = 1 : n_en
+  %       QQ = LM(ee, bb);
+  %       if QQ > 0
+  %         K(PP, QQ) = K(PP, QQ) + k_ele(aa, bb);
+  %       else
+  %         % modify F with the boundary data
+  %         % here we do nothing because the boundary data g is zero or
+  %         % homogeneous
+  %       end
+  %     end  
+  %   end
+  % end
   end
 end
 
