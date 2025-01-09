@@ -3,12 +3,17 @@ clear all; clc;
 %%整体思路：利用一个逻辑值来控制当前反向，然后在当前方向视为一个自由度二维问题，解出来后循环到下一个自由度，最后拼起来即可（当前版本不考虑3维）
 %由于耦合，上述思路放弃了，转为直接使用书上思路
 %%参数导入   需要用户修改的部分
+quarter_plate_with_hole_quad;
 
+T=1;R=1;x=1;y=1;
+[str,stxi,tor,xita]=stresspoly(T,R,x,y);
+[stx,sty,tau]=polytocoor(str,stxi,tor,xita);
 E=1E9;%表示模量
 mu=0.3;%泊松比
 coe=E/(1-mu^2);%表系数
 t=0;% test parameter
 D = zeros(3);%D阵一步到胃
+
 D(1,1)=coe;D(2,2)=D(1,1);D(1,2)=coe*mu;D(2,1)=D(1,2);D(3,3)=coe*(1-mu)/2;
 %%检验方程
 % exact solution
@@ -29,20 +34,21 @@ n_int_xi  = 10;
 n_int_eta = 10;
 n_int     = n_int_xi * n_int_eta;
 [xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta);%尝试修改 GAUSS 切换后生成高斯网格
+
 error_L2=[];
 error_H1=[];
 hh=[];
 %%生成网格部分，似乎已经被gmsh替代
 % mesh generation
 n_en   = 4;               % number of nodes in an element
-for n_el_x = 2:2:16             % number of elements in x-dir 划分单元格
+n_el_x = 9;            % number of elements in x-dir 划分单元格
 
 n_el_y = n_el_x;               % number of elements in y-dir
-n_el   = n_el_x * n_el_y; % total number of elements  总单元数  三角形中*2
+n_el   = length(msh.QUADS); % total number of elements  总单元数  三角形中*2
 
 n_np_x = n_el_x + 1;      % number of nodal points in x-dir  节点数
 n_np_y = n_el_y + 1;      % number of nodal points in y-dir
-n_np   = n_np_x * n_np_y; % total number of nodal points 总节点数
+n_np   = msh.nbNod; % total number of nodal points 总节点数
 
 x_coor = zeros(n_np, 1);  %坐标 两者相同   划分为三角形时 每个矩形被划分为两个三角形 于是 n_el翻倍
 y_coor = x_coor;            %但是n_np不变
@@ -63,31 +69,36 @@ end
 %%IEN部分 这里可以加一个判断 跳过重新生成Ien
 % IEN array
 
-IEN = zeros(n_el, n_en); %element和其所连接的点的关系
-for ex = 1 : n_el_x
-    for ey = 1 : n_el_y
-        ee = (ey-1) * n_el_x + ex; % element index  第几个元素
-        IEN(ee, 1) = (ey-1) * n_np_x + ex;  %需要修改 原代码一次意外着一个方格，也就是一次可以描述两个三角形
-        IEN(ee, 2) = (ey-1) * n_np_x + ex + 1;%第一个三角形对应2*ee-1 第二个对应2*ee 再将节点补齐即可完成改写
-        IEN(ee, 3) =  ey    * n_np_x + ex + 1;
-        IEN(ee, 4) =  ey    * n_np_x + ex;
-    end
-end
+IEN = msh.QUADS(:,1:4);
 
 % ID array
-ID = zeros(n_np,2);
+ID = zeros(msh.nbNod,2)+1;
 counter = 0;
-for ny = 2 : n_np_y - 1%从2开始，因为边界没有方程
-    for nx = 2 : n_np_x - 1
-        index = (ny-1)*n_np_x + nx;%为每一个点编号
-        counter = counter + 1;
-        ID(index,1) = counter;
-        counter=counter+1;
-        ID(index,2)=counter;
+for i=1:length(msh.LINES)
+    if msh.LINES(i,3)==10 || msh.LINES(i,3)==11
+        ID(msh.LINES(i,1),1)=0;
+        ID(msh.LINES(i,1),2)=0;
+        ID(msh.LINES(i,2),1)=0;
+        ID(msh.LINES(i,2),2)=0;
     end
 end
-
+IDT=ID;%IDT才是真正的ID矩阵
+IDS=-(ID-1);%影子阵 用于判断纽曼边界条件
+for i=1:length(IEN)
+    for j=1:n_en
+        if ID(IEN(i,j))
+            counter=counter+1;
+            IDT(IEN(i,j),1)=counter;
+            ID(IEN(i,j),1)=0;
+            counter=counter+1;
+            IDT(IEN(i,j),2)=counter;
+            ID(IEN(i,j),2)=0;
+        end
+    end
+end
+ID=IDT;%后面就不用改变量名了
 n_eq = counter;%计算内部网格
+
 
 %%k阵和f阵建立
 % allocate the stiffness matrix and load vector
@@ -103,8 +114,6 @@ F = zeros(n_eq, 1);
 %误差中k=1 但是
 
 % loop over element to assembly the matrix and vector  下面是uh的程序
-%思路1，每一个边界的u都算出来，根据命名决定是否代入方程
-%思路2，筛选出我需要代入的节点，在积分求和
 for ee = 1 : n_el
     x_ele = x_coor( IEN(ee, 1:n_en) );
     y_ele = y_coor( IEN(ee, 1:n_en) );
@@ -147,6 +156,7 @@ for ee = 1 : n_el
             %出错点1？
             f_ele(pp+1) = f_ele(pp+1) + weight(ll) * detJ * f(x_l, y_l,1) * Na;%需要修改 似乎不用，i和j表示方向后就是看dir 但是两个方向是分开的 只需要最后存储的时候注意就可以了
             f_ele(pp+2) = f_ele(pp+2) + weight(ll) * detJ * f(x_l, y_l,2) * Na;
+            
             for bb = 1 : n_en
 
                 Nb = Quad(bb, xi(ll), eta(ll));
@@ -170,7 +180,7 @@ for ee = 1 : n_el
         end
     end
     %下面一段是原来ele和F的对应式子，需要补充边界条件就在这基础上修改
-
+    %这里需要关于h的积分 但是目前
     for aa = 1 : n_en
         for i=1:dof
             PP = ID(IEN(ee,aa),i);
@@ -186,9 +196,12 @@ for ee = 1 : n_el
                             % modify F with the boundary data
                             % here we do nothing because the boundary data g is zero or
                             % homogeneous
+                           
                         end
                     end
                 end
+            else 
+
             end
         end
     end
@@ -263,7 +276,7 @@ for ee = 1 : n_el   %单元内划分
 end
 error_L2=[error_L2 sqrt(el2)];
 error_H1=[error_H1 sqrt(eh1)];
-end
+
 figure;
 plot(log(hh), log(error_L2), '-r','LineWidth',3);%出来函数图像很奇怪 不知道哪里出问题 拟合结果为4和3
 hold on;
