@@ -29,12 +29,14 @@ n_int_xi  = 10;
 n_int_eta = 10;
 n_int     = n_int_xi * n_int_eta;
 [xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta);%尝试修改 GAUSS 切换后生成高斯网格
-
+error_L2=[];
+error_H1=[];
+hh=[];
 %%生成网格部分，似乎已经被gmsh替代
 % mesh generation
 n_en   = 4;               % number of nodes in an element
- n_el_x = 3             % number of elements in x-dir 划分单元格
-   
+for n_el_x = 2:2:16             % number of elements in x-dir 划分单元格
+
 n_el_y = n_el_x;               % number of elements in y-dir
 n_el   = n_el_x * n_el_y; % total number of elements  总单元数  三角形中*2
 
@@ -48,7 +50,7 @@ y_coor = x_coor;            %但是n_np不变
 hx = 1.0 / n_el_x;        % mesh size in x-dir  在三角形中hx需要*2  网格不均匀？
 hy = 1.0 / n_el_y;        % mesh size in y-dir
 
-
+hh=[hh hx];
 % generate the nodal coordinates
 for ny = 1 : n_np_y
     for nx = 1 : n_np_x
@@ -165,30 +167,30 @@ for ee = 1 : n_el
             end % end of quadrature loop
         end
     end
-        %下面一段是原来ele和F的对应式子，需要补充边界条件就在这基础上修改
-        
-        for aa = 1 : n_en
-            for i=1:dof
-                PP = ID(IEN(ee,aa),i);
-                if PP > 0  %比对1
-                    F(PP) = F(PP) + f_ele(dof*(aa-1)+i);%算了不管了，反正我得到了K阵和F阵
+    %下面一段是原来ele和F的对应式子，需要补充边界条件就在这基础上修改
 
-                    for bb = 1 : n_en
-                        for j=1:dof
-                            QQ = ID(IEN(ee,bb),j);
-                            if QQ > 0%比对2
-                                K(PP, QQ) = K(PP, QQ) + k_ele(dof*(aa-1)+i, dof*(bb-1)+j);
-                            else
-                                % modify F with the boundary data
-                                % here we do nothing because the boundary data g is zero or
-                                % homogeneous
-                            end
+    for aa = 1 : n_en
+        for i=1:dof
+            PP = ID(IEN(ee,aa),i);
+            if PP > 0  %比对1
+                F(PP) = F(PP) + f_ele(dof*(aa-1)+i);%算了不管了，反正我得到了K阵和F阵
+
+                for bb = 1 : n_en
+                    for j=1:dof
+                        QQ = ID(IEN(ee,bb),j);
+                        if QQ > 0%比对2
+                            K(PP, QQ) = K(PP, QQ) + k_ele(dof*(aa-1)+i, dof*(bb-1)+j);
+                        else
+                            % modify F with the boundary data
+                            % here we do nothing because the boundary data g is zero or
+                            % homogeneous
                         end
                     end
                 end
             end
         end
-        % F=F+(h,Na)+a(a,B)*g;
+    end
+    % F=F+(h,Na)+a(a,B)*g;
 end
 
 % solve the stiffness matrix
@@ -199,12 +201,12 @@ disp = zeros(n_np, 2); %得到拟合项系数
 
 for ii = 1 : n_np   %表达本身也有问题，需要列表
     for dim=1:dof
-    index = ID(ii,dim);
-    if index > 0
-        disp(ii,dim) = dn(index);
-    else
-        % modify disp with the g data. Here it does nothing because g is zero
-    end
+        index = ID(ii,dim);
+        if index > 0
+            disp(ii,dim) = dn(index);
+        else
+            % modify disp with the g data. Here it does nothing because g is zero
+        end
     end
 end
 
@@ -234,33 +236,34 @@ for ee = 1 : n_el   %单元内划分
 
         detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;%雅可比行列式  到这里都没问题
 
-        uh=[0,0]; uh_x=uh;uh_y=uh;e=uh;e_x=uh_x;e_y=uh_y;
+        uh=zeros(2,1); uh_x=uh;uh_y=uh;e=uh;e_x=uh_x;e_y=uh_y;
         for aa = 1 : n_en%我又得去看书了，忘记原始公式了 拟合的准则似乎没变 变得只有形函数
             Na = Quad(aa, xi(ll), eta(ll));
             [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
             Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;%笔记公式
             Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
             for i =1:dof
-            uh(i)=uh(i)+uhp(aa,i)*Na; %步骤2
-            uh_x(i)=uh_x(i)+uhp(aa,i)*Na_x;%存疑项
-            uh_y(i)=uh_y(i)+uhp(aa,i)*Na_y;
-            e(i)=uh(i)-exact(x_l,y_l,i);
-            e_x(i)=uh_x(i)-exact_x(x_l,y_l,i);%可能需要两个自由度分别表示 但是耦合项？
-            e_y(i)=uh_y(i)-exact_y(x_l,y_l,i);
-              %计算uh
-        end % end of aa loop
-        %到这里暂存了一个节点的uh uh_x和uh_y   并且在quadrature rule 内部 这里完成积分
-        
+                uh(i)=uh(i)+uhp(aa,i)*Na; %步骤2
+                uh_x(i)=uh_x(i)+uhp(aa,i)*Na_x;%存疑项
+                uh_y(i)=uh_y(i)+uhp(aa,i)*Na_y;
+                %计算uh
+            end % end of aa loop
+            %到这里暂存了一个节点的uh uh_x和uh_y   并且在quadrature rule 内部 这里完成积分
+            for i= 1:dof
+                e(i)=uh(i)-exact(x_l,y_l,i);
+                e_x(i)=uh_x(i)-exact_x(x_l,y_l,i);%可能需要两个自由度分别表示 但是耦合项？
+                e_y(i)=uh_y(i)-exact_y(x_l,y_l,i);
+            end
+        end % end of quadrature loop
         el2=el2+weight(ll)*detJ*(e.^2);
         eh1=eh1+weight(ll)*detJ*(e_x.^2+e_y.^2);
-    end % end of quadrature loop
     end
 end
-yy(n_el_x/2)=sqrt(el2);
-yd(n_el_x/2)=sqrt(eh1);
-xx(n_el_x/2)=hx;
-
+error_L2=[error_L2 sqrt(el2)];
+error_H1=[error_H1 sqrt(eh1)];
+end
 figure;
-plot(log(xx), log(yy), '-r','LineWidth',3);%出来函数图像很奇怪 不知道哪里出问题 拟合结果为4和3
+plot(log(hh), log(error_L2), '-r','LineWidth',3);%出来函数图像很奇怪 不知道哪里出问题 拟合结果为4和3
 hold on;
-plot(log(xx),log(yd),'b');
+plot(log(hh),log(error_H1),'b');
+
