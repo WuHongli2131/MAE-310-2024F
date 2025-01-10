@@ -103,6 +103,8 @@ F = zeros(n_eq, 1);
 %误差中k=1 但是
 
 % loop over element to assembly the matrix and vector  下面是uh的程序
+%思路1，每一个边界的u都算出来，根据命名决定是否代入方程
+%思路2，筛选出我需要代入的节点，在积分求和
 for ee = 1 : n_el
     x_ele = x_coor( IEN(ee, 1:n_en) );
     y_ele = y_coor( IEN(ee, 1:n_en) );

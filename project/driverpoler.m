@@ -4,11 +4,10 @@ clear all; clc;
 %由于耦合，上述思路放弃了，转为直接使用书上思路
 %%参数导入   需要用户修改的部分
 quarter_plate_with_hole_quad;
-T=1;R=1;x=1;y=1;xita=atan2(y,x);r=sqrt(x^2+y^2);
-str=T/2*(1-R^2/r^2)+T/2*(1-4*R^2/r^2+3*R^4/r^4)*cos(2*xita);
-stxi=T/2*(1+R^2/r^2)-T/2*(1+3*R^4/r^4)*cos(2*xita);
-tau=-T/2*(1+2*R^2/r^2-3*R^4/r^4)*sin(2*xita);
-[stx,sty,tor]=polytocoor(str,stxi,tau,xita);
+
+T=1;R=1;x=1;y=1;
+[str,stxi,tor,xita]=stresspoly(T,R,x,y);
+[stx,sty,tau]=polytocoor(str,stxi,tor,xita);
 E=1E9;%表示模量
 mu=0.3;%泊松比
 coe=E/(1-mu^2);%表系数
@@ -35,20 +34,21 @@ n_int_xi  = 10;
 n_int_eta = 10;
 n_int     = n_int_xi * n_int_eta;
 [xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta);%尝试修改 GAUSS 切换后生成高斯网格
+
 error_L2=[];
 error_H1=[];
 hh=[];
 %%生成网格部分，似乎已经被gmsh替代
 % mesh generation
 n_en   = 4;               % number of nodes in an element
-for n_el_x = 2:2:16             % number of elements in x-dir 划分单元格
+n_el_x = 9;            % number of elements in x-dir 划分单元格
 
 n_el_y = n_el_x;               % number of elements in y-dir
-n_el   = n_el_x * n_el_y; % total number of elements  总单元数  三角形中*2
+n_el   = length(msh.QUADS); % total number of elements  总单元数  三角形中*2
 
 n_np_x = n_el_x + 1;      % number of nodal points in x-dir  节点数
 n_np_y = n_el_y + 1;      % number of nodal points in y-dir
-n_np   = n_np_x * n_np_y; % total number of nodal points 总节点数
+n_np   = msh.nbNod; % total number of nodal points 总节点数
 
 x_coor = zeros(n_np, 1);  %坐标 两者相同   划分为三角形时 每个矩形被划分为两个三角形 于是 n_el翻倍
 y_coor = x_coor;            %但是n_np不变
@@ -69,23 +69,36 @@ end
 %%IEN部分 这里可以加一个判断 跳过重新生成Ien
 % IEN array
 
-IEN = msh.QUADS;
-
+IEN = msh.QUADS(:,1:4);
 
 % ID array
-ID = zeros(n_np,2);
+ID = zeros(msh.nbNod,2)+1;
 counter = 0;
-for ny = 2 : n_np_y - 1%从2开始，因为边界没有方程
-    for nx = 2 : n_np_x - 1
-        index = (ny-1)*n_np_x + nx;%为每一个点编号
-        counter = counter + 1;
-        ID(index,1) = counter;
-        counter=counter+1;
-        ID(index,2)=counter;
+for i=1:length(msh.LINES)
+    if msh.LINES(i,3)==10 || msh.LINES(i,3)==11
+        ID(msh.LINES(i,1),1)=0;
+        ID(msh.LINES(i,1),2)=0;
+        ID(msh.LINES(i,2),1)=0;
+        ID(msh.LINES(i,2),2)=0;
     end
 end
-
+IDT=ID;%IDT才是真正的ID矩阵
+IDS=-(ID-1);%影子阵 用于判断纽曼边界条件
+for i=1:length(IEN)
+    for j=1:n_en
+        if ID(IEN(i,j))
+            counter=counter+1;
+            IDT(IEN(i,j),1)=counter;
+            ID(IEN(i,j),1)=0;
+            counter=counter+1;
+            IDT(IEN(i,j),2)=counter;
+            ID(IEN(i,j),2)=0;
+        end
+    end
+end
+ID=IDT;%后面就不用改变量名了
 n_eq = counter;%计算内部网格
+
 
 %%k阵和f阵建立
 % allocate the stiffness matrix and load vector
@@ -124,9 +137,33 @@ for ee = 1 : n_el
             dy_dxi  = dy_dxi  + y_ele(aa) * Na_xi;
             dy_deta = dy_deta + y_ele(aa) * Na_eta;
         end
-
+        
         detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;%雅可比行列式
         %因为可能要改三维。。这里ij写成循环形式
+        %试写纽曼
+        
+        for aa=1:n_en
+            Na = Quad(aa, xi(ll), eta(ll));
+            [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+            Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
+            Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
+            %投机取巧
+            h1=0;h2=0;
+            if aa<n_en
+                for m=1:length(msh.LINES)
+                    if [IEN(ee,aa),IEN(ee,aa+1)]==[msh.LINES(m,1) msh.LINES(m,2)] && (msh.LINES(m,3)==11) %检索底部纽曼边界条件
+                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第一个点
+                        [stx sty tau]=polytocoor(str,stxi,tor,xita);
+                        h1=[stx tau;sty tau].*[0 -1];
+                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+                        [stx sty tau]=polytocoor(str,stxi,tor,xita);
+                        h2=[stx tau;sty tau].*[0 -1];
+                        
+                    end   
+                end
+            else
+            end
+        end
 
         for aa = 1 : n_en%我又得去看书了，忘记原始公式了
             Na = Quad(aa, xi(ll), eta(ll));
@@ -141,8 +178,11 @@ for ee = 1 : n_el
 
             pp=dof*(aa-1);
             %出错点1？
+            %这里判断是否需要加纽曼，能加直接加
+            
             f_ele(pp+1) = f_ele(pp+1) + weight(ll) * detJ * f(x_l, y_l,1) * Na;%需要修改 似乎不用，i和j表示方向后就是看dir 但是两个方向是分开的 只需要最后存储的时候注意就可以了
             f_ele(pp+2) = f_ele(pp+2) + weight(ll) * detJ * f(x_l, y_l,2) * Na;
+            
             for bb = 1 : n_en
 
                 Nb = Quad(bb, xi(ll), eta(ll));
@@ -166,7 +206,7 @@ for ee = 1 : n_el
         end
     end
     %下面一段是原来ele和F的对应式子，需要补充边界条件就在这基础上修改
-
+    %这里需要关于h的积分 但是目前
     for aa = 1 : n_en
         for i=1:dof
             PP = ID(IEN(ee,aa),i);
@@ -182,9 +222,12 @@ for ee = 1 : n_el
                             % modify F with the boundary data
                             % here we do nothing because the boundary data g is zero or
                             % homogeneous
+                           
                         end
                     end
                 end
+            else 
+
             end
         end
     end
@@ -259,7 +302,7 @@ for ee = 1 : n_el   %单元内划分
 end
 error_L2=[error_L2 sqrt(el2)];
 error_H1=[error_H1 sqrt(eh1)];
-end
+
 figure;
 plot(log(hh), log(error_L2), '-r','LineWidth',3);%出来函数图像很奇怪 不知道哪里出问题 拟合结果为4和3
 hold on;
