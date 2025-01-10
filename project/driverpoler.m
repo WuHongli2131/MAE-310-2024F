@@ -5,7 +5,7 @@ clear all; clc;
 %%参数导入   需要用户修改的部分
 quarter_plate_with_hole_quad;
 
-T=1e9;R=0.5;
+T=1e4;R=0.5;
 % [str,stxi,tor,xita]=stresspoly(T,R,x,y);
 % [stx,sty,tau]=polytocoor(str,stxi,tor,xita);
 E=1E9;%表示模量
@@ -21,10 +21,10 @@ dof=2;%自由度
 exact = @(x,y,d) (d==1)*x*(1-x)*y*(1-y)+(d==2)*x*(1-x)*y*(1-y);%dir表示当前方向，在前方加入循环即可将代码实现多次计算
 exact_x = @(x,y,d) (d==1)*(1-2*x)*y*(1-y)+(d==2)*(1-2*x)*y*(1-y);
 exact_y = @(x,y,d) (d==1)*x*(1-x)*(1-2*y)+(d==2)*x*(1-x)*(1-2*y);
-f = @(x,y,d) (d==1)*((2*E*y*(y - 1))/(mu^2 - 1) - (E*(mu/2 - 1/2)...
+f = @(x,y,d) (d==3 )*((2*E*y*(y - 1))/(mu^2 - 1) - (E*(mu/2 - 1/2)...
     *((x - 1)*(y - 1) + x*y + 2*x*(x - 1) + x*(y - 1) + y*...
     (x - 1)))/(mu^2 - 1) + (E*mu*((x - 1)*(y - 1) + x*y + x*(y - 1) + y*(x - 1)))/(mu^2 - 1))...
-    +(d==2)*((2*E*x*(x - 1))/(mu^2 - 1) - (E*(mu/2 - 1/2)*((x - 1)*(y - 1) + x*y + ...
+    +(d==3)*((2*E*x*(x - 1))/(mu^2 - 1) - (E*(mu/2 - 1/2)*((x - 1)*(y - 1) + x*y + ...
     x*(y - 1) + y*(x - 1) + 2*y*(y - 1)))/(mu^2 - 1) + ...
     (E*mu*((x - 1)*(y - 1) + x*y + x*(y - 1) + y*(x - 1)))/(mu^2 - 1)); % source term
 
@@ -41,7 +41,7 @@ hh=[];
 %%生成网格部分，似乎已经被gmsh替代
 % mesh generation
 n_en   = 4;               % number of nodes in an element
-n_el_x = 9;            % number of elements in x-dir 划分单元格
+n_el_x = 3;            % number of elements in x-dir 划分单元格
 
 n_el_y = n_el_x;               % number of elements in y-dir
 n_el   = length(msh.QUADS); % total number of elements  总单元数  三角形中*2
@@ -50,27 +50,37 @@ n_np_x = n_el_x + 1;      % number of nodal points in x-dir  节点数
 n_np_y = n_el_y + 1;      % number of nodal points in y-dir
 n_np   = msh.nbNod; % total number of nodal points 总节点数
 
-x_coor = zeros(n_np, 1);  %坐标 两者相同   划分为三角形时 每个矩形被划分为两个三角形 于是 n_el翻倍
-y_coor = x_coor;            %但是n_np不变
+x_coor = msh.POS(:,1);  %坐标 两者相同   划分为三角形时 每个矩形被划分为两个三角形 于是 n_el翻倍
+y_coor = msh.POS(:,2);            %但是n_np不变
 
 hx = 1.0 / n_el_x;        % mesh size in x-dir  在三角形中hx需要*2  网格不均匀？
 hy = 1.0 / n_el_y;        % mesh size in y-dir
 
 hh=[hh hx];
 % generate the nodal coordinates
-for ny = 1 : n_np_y
-    for nx = 1 : n_np_x
-        index = (ny-1)*n_np_x + nx; % nodal index 似乎是用于鉴定节点是否正确的变量，无实际意义
-        x_coor(index) = (nx-1) * hx;% 坐标  不用动
-        y_coor(index) = (ny-1) * hy;
-    end
-end
+% for ny = 1 : n_np_y
+%     for nx = 1 : n_np_x
+%         index = (ny-1)*n_np_x + nx; % nodal index 似乎是用于鉴定节点是否正确的变量，无实际意义
+%         x_coor(index) = (nx-1) * hx;% 坐标  不用动
+%         y_coor(index) = (ny-1) * hy;
+%     end
+% end
 
 %%IEN部分 这里可以加一个判断 跳过重新生成Ien
 % IEN array
 
-IEN = msh.QUADS(:,1:4);
 
+
+IEN_tri = zeros(1,1);
+IEN = msh.QUADS(:,1:4);
+for ee = 1:size(IEN,1)
+IEN_tri(ee*2-1,1) = IEN(ee,1);
+IEN_tri(ee*2-1,2) = IEN(ee,2);
+IEN_tri(ee*2-1,3) = IEN(ee,3);
+IEN_tri(ee*2,1) = IEN(ee,1);
+IEN_tri(ee*2,2) = IEN(ee,3);
+IEN_tri(ee*2,3) = IEN(ee,4);
+end
 % ID array
 ID = zeros(msh.nbNod,2)+1;
 counter = 0;
@@ -116,7 +126,7 @@ F = zeros(n_eq, 1);
 % loop over element to assembly the matrix and vector  下面是uh的程序
 for ee = 1 : n_el
     x_ele = x_coor( IEN(ee, 1:n_en) );
-    y_ele = y_coor( IEN(ee, 1:n_en) );
+     y_ele = y_coor( IEN(ee, 1:n_en) );
 
     k_ele = zeros(2*n_en, 2*n_en); % element stiffness matrix 最后应该是一个三对角
     f_ele = zeros(2*n_en, 1);    % elemenlt oad vector
@@ -138,9 +148,9 @@ for ee = 1 : n_el
             dy_deta = dy_deta + y_ele(aa) * Na_eta;
         end
         
-        detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;%雅可比行列式
-        %因为可能要改三维。。这里ij写成循环形式
-        %试写纽曼
+        detJ = abs(dx_dxi * dy_deta - dx_deta * dy_dxi);%雅可比行列式
+        % %因为可能要改三维。。这里ij写成循环形式
+        % %试写纽曼
         % for aa=1:n_en
         %     Na = Quad(aa, xi(ll), eta(ll));
         %     [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
@@ -148,37 +158,48 @@ for ee = 1 : n_el
         %     Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
         %     %投机取巧
         %     h11=0;h12=0;h21=0;h22=0;
-        %     if aa<n_en
+        %     if aa==n_en
+        %         point1=IEN(ee,aa);
+        %         point2=IEN(ee,1);
         %         for m=1:length(msh.LINES)
-        %             if [IEN(ee,aa),IEN(ee,aa+1)]==[msh.LINES(m,1) msh.LINES(m,2)] && (msh.LINES(m,3)==11) %检索底部纽曼边界条件
-        %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第一个点
+        %             p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+        %             if (msh.LINES(m,3)==11)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2)) %检索底部纽曼边界条件
+        %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
         %                 [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
         %                 h11=[1,0].*[stx tau;tau sty].*[0 -1]';
         %                 h12=[0,1].*[stx tau;tau sty].*[0 -1]';
-        %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+        %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(P2,2));%第一个点
         %                 [stx, sty, tau]=polytocoor(str,stxi,tor,xita);
         % 
         %                 h21=[1,0].*[stx tau;tau sty].*[0 -1]';
         %                 h22=[0,1].*[stx tau;tau sty].*[0 -1]';
+        %                 f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+        %                 f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h21,h22);
+        %             end
+        %         end
+        %     else
+        %         point1=IEN(ee,aa);
+        %         point2=IEN(ee,aa+1);
+        %         for m=1:length(msh.LINES)
+        %             p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+        %             if(msh.LINES(m,3)==10)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2))
+        % 
+        %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+        %                 [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+        %                 h11=[1,0].*[stx tau;tau sty].*[-1 0]';
+        %                 h12=[0,1].*[stx tau;tau sty].*[-1 0]';
+        %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第二个点
+        %                 [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+        %                 h21=[1,0].*[stx tau;tau sty].*[-1 0]';
+        %                 h22=[0,1].*[stx tau;tau sty].*[-1 0]';
         %                 f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
         %                 f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
-        %             end   
+        %             end
         %         end
-        %     elseif [IEN(ee,aa+1),IEN(ee,aa)]==[msh.LINES(m,1) msh.LINES(m,2)] && (msh.LINES(m,3)==10)%检索左侧
-        %         [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
-        %         [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
-        %         h11=[1,0].*[stx tau;tau sty].*[-1 0]';
-        %         h12=[0,1].*[stx tau;tau sty].*[-1 0]';
-        %         [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第二个点
-        %         [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-        %         h21=[1,0].*[stx tau;tau sty].*[-1 0]';
-        %         h22=[0,1].*[stx tau;tau sty].*[-1 0]';
-        %         f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
-        %         f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
         %     end
         % end
 
-        for aa = 1 : n_en%我又得去看书了，忘记原始公式了
+         for aa = 1 : n_en%我又得去看书了，忘记原始公式了
             Na = Quad(aa, xi(ll), eta(ll));
             [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
             Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
@@ -186,44 +207,44 @@ for ee = 1 : n_el
             %一阶导拟合 B阵在这里完成
             %F阵纽曼边界
             h11=0;h12=0;h21=0;h22=0;
-            if aa<n_en
+            if aa==n_en
+                point1=IEN(ee,aa);
+                point2=IEN(ee,1);
                 for m=1:length(msh.LINES)
-                    if IEN(ee,aa)==msh.LINES(m,1) &&IEN(ee,aa+1)==msh.LINES(m,2)&& (msh.LINES(m,3)==11) %检索底部纽曼边界条件
-                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第一个点
+                    p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+                    if (msh.LINES(m,3)==10)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2)) %检索底部纽曼边界条件
+                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
                         [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-                        h11=[1,0].*[stx tau;tau sty].*[0 -1]';
-                        h12=[0,1].*[stx tau;tau sty].*[0 -1]';
-                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+                        h11=[1,0]*[stx tau;tau sty]*[0 -1]';
+                        h12=[0,1]*[stx tau;tau sty]*[0 -1]';
+                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第一个点
                         [stx, sty, tau]=polytocoor(str,stxi,tor,xita);
-                       
-                        h21=[1,0].*[stx tau;tau sty].*[0 -1]';
-                        h22=[0,1].*[stx tau;tau sty].*[0 -1]';
-                        f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
-                        f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
-                    end   
+
+                        h21=[1,0]*[stx tau;tau sty]*[0 -1]';
+                        h22=[0,1]*[stx tau;tau sty]*[0 -1]';
+                        f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+                        f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h21,h22);
+                    end
                 end
-            elseif aa==4&&IEN(ee,4)==msh.LINES(m,1)&&IEN(ee,4)== msh.LINES(m,2) && (msh.LINES(m,3)==10)%特殊
-                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,4),1),msh.POS(IEN(ee,4),2));%第一个点
-                [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
-                h11=[1,0].*[stx tau;tau sty].*[-1 0]';
-                h12=[0,1].*[stx tau;tau sty].*[-1 0]';
-                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,1),1),msh.POS(IEN(ee,1),2));%第二个点
-                [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-                h21=[1,0].*[stx tau;tau sty].*[-1 0]';
-                h22=[0,1].*[stx tau;tau sty].*[-1 0]';
-                f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,4),1),msh.POS(IEN(ee,4),2),msh.POS(IEN(ee,1),1),msh.POS(IEN(ee,1),2),h11,h12);
-                f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,4),1),msh.POS(IEN(ee,4),2),msh.POS(IEN(ee,1),1),msh.POS(IEN(ee,1),2),h21,h22);
-            % elseif IEN(ee,aa+1)==msh.LINES(m,1)&&IEN(ee,aa)== msh.LINES(m,2) && (msh.LINES(m,3)==10)%检索左侧
-            %     [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
-            %     [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
-            %     h11=[1,0].*[stx tau;tau sty].*[-1 0]';
-            %     h12=[0,1].*[stx tau;tau sty].*[-1 0]';
-            %     [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第二个点
-            %     [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-            %     h21=[1,0].*[stx tau;tau sty].*[-1 0]';
-            %     h22=[0,1].*[stx tau;tau sty].*[-1 0]';
-            %     f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
-            %     f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
+            else
+                point1=IEN(ee,aa);
+                point2=IEN(ee,aa+1);
+                for m=1:length(msh.LINES)
+                    p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+                    if(msh.LINES(m,3)==11)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2))
+
+                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
+                        [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+                        h11=[1,0]*[stx tau;tau sty]*[-1 0]';
+                        h12=[0,1]*[stx tau;tau sty]*[-1 0]';
+                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
+                        [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+                        h21=[1,0]*[stx tau;tau sty]*[-1 0]';
+                        h22=[0,1]*[stx tau;tau sty]*[-1 0]';
+                        f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+                        f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+                    end
+                end
             end
             Ba(1,1)=Na_x;
             Ba(2,2)=Na_y;
@@ -253,6 +274,7 @@ for ee = 1 : n_el
                         qq=dof*(bb-1)+j;
                         ej=(j==1)*[1,0]+(j==2)*[0,1];
                         k_ele(pp+i,qq) = k_ele(pp+i,qq) + weight(ll) * detJ *ei*Ba'*D*Bb*ej';%确认正确
+
                         % t = weight(ll) * detJ *ei*Ba'*D*Bb*ej'
                     end % end of bb loop
                 end % end of aa loop
@@ -329,7 +351,7 @@ for ee = 1 : n_el   %单元内划分
             dy_deta = dy_deta + y_ele(aa) * Na_eta;
         end
 
-        detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;%雅可比行列式  到这里都没问题
+        detJ = abs(dx_dxi * dy_deta - dx_deta * dy_dxi);%雅可比行列式  到这里都没问题
 
         uh=zeros(2,1); uh_x=uh;uh_y=uh;e=uh;e_x=uh_x;e_y=uh_y;
         for aa = 1 : n_en%我又得去看书了，忘记原始公式了 拟合的准则似乎没变 变得只有形函数
@@ -357,8 +379,14 @@ end
 error_L2=[error_L2 sqrt(el2)];
 error_H1=[error_H1 sqrt(eh1)];
 
-figure;
-plot(log(hh), log(error_L2), '-r','LineWidth',3);%出来函数图像很奇怪 不知道哪里出问题 拟合结果为4和3
-hold on;
-plot(log(hh),log(error_H1),'b');
+% figure;
+% plot(log(hh), log(error_L2), '-r','LineWidth',3);%出来函数图像很奇怪 不知道哪里出问题 拟合结果为4和3
+% hold on;
+% plot(log(hh),log(error_H1),'b');
 
+hold on;
+trisurf(IEN_tri, x_coor, y_coor, disp(:,1));
+
+axis equal;
+colormap jet
+shading interp
