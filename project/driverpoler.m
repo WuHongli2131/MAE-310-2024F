@@ -5,9 +5,9 @@ clear all; clc;
 %%参数导入   需要用户修改的部分
 quarter_plate_with_hole_quad;
 
-T=1;R=1;x=1;y=1;
-[str,stxi,tor,xita]=stresspoly(T,R,x,y);
-[stx,sty,tau]=polytocoor(str,stxi,tor,xita);
+T=1e9;R=0.5;
+% [str,stxi,tor,xita]=stresspoly(T,R,x,y);
+% [stx,sty,tau]=polytocoor(str,stxi,tor,xita);
 E=1E9;%表示模量
 mu=0.3;%泊松比
 coe=E/(1-mu^2);%表系数
@@ -141,29 +141,42 @@ for ee = 1 : n_el
         detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;%雅可比行列式
         %因为可能要改三维。。这里ij写成循环形式
         %试写纽曼
-        
-        for aa=1:n_en
-            Na = Quad(aa, xi(ll), eta(ll));
-            [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
-            Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
-            Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
-            %投机取巧
-            h1=0;h2=0;
-            if aa<n_en
-                for m=1:length(msh.LINES)
-                    if [IEN(ee,aa),IEN(ee,aa+1)]==[msh.LINES(m,1) msh.LINES(m,2)] && (msh.LINES(m,3)==11) %检索底部纽曼边界条件
-                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第一个点
-                        [stx sty tau]=polytocoor(str,stxi,tor,xita);
-                        h1=[stx tau;sty tau].*[0 -1];
-                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
-                        [stx sty tau]=polytocoor(str,stxi,tor,xita);
-                        h2=[stx tau;sty tau].*[0 -1];
-                        
-                    end   
-                end
-            else
-            end
-        end
+        % for aa=1:n_en
+        %     Na = Quad(aa, xi(ll), eta(ll));
+        %     [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+        %     Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
+        %     Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
+        %     %投机取巧
+        %     h11=0;h12=0;h21=0;h22=0;
+        %     if aa<n_en
+        %         for m=1:length(msh.LINES)
+        %             if [IEN(ee,aa),IEN(ee,aa+1)]==[msh.LINES(m,1) msh.LINES(m,2)] && (msh.LINES(m,3)==11) %检索底部纽曼边界条件
+        %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第一个点
+        %                 [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+        %                 h11=[1,0].*[stx tau;tau sty].*[0 -1]';
+        %                 h12=[0,1].*[stx tau;tau sty].*[0 -1]';
+        %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+        %                 [stx, sty, tau]=polytocoor(str,stxi,tor,xita);
+        % 
+        %                 h21=[1,0].*[stx tau;tau sty].*[0 -1]';
+        %                 h22=[0,1].*[stx tau;tau sty].*[0 -1]';
+        %                 f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
+        %                 f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
+        %             end   
+        %         end
+        %     elseif [IEN(ee,aa+1),IEN(ee,aa)]==[msh.LINES(m,1) msh.LINES(m,2)] && (msh.LINES(m,3)==10)%检索左侧
+        %         [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+        %         [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+        %         h11=[1,0].*[stx tau;tau sty].*[-1 0]';
+        %         h12=[0,1].*[stx tau;tau sty].*[-1 0]';
+        %         [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第二个点
+        %         [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+        %         h21=[1,0].*[stx tau;tau sty].*[-1 0]';
+        %         h22=[0,1].*[stx tau;tau sty].*[-1 0]';
+        %         f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
+        %         f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
+        %     end
+        % end
 
         for aa = 1 : n_en%我又得去看书了，忘记原始公式了
             Na = Quad(aa, xi(ll), eta(ll));
@@ -171,6 +184,47 @@ for ee = 1 : n_el
             Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
             Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
             %一阶导拟合 B阵在这里完成
+            %F阵纽曼边界
+            h11=0;h12=0;h21=0;h22=0;
+            if aa<n_en
+                for m=1:length(msh.LINES)
+                    if IEN(ee,aa)==msh.LINES(m,1) &&IEN(ee,aa+1)==msh.LINES(m,2)&& (msh.LINES(m,3)==11) %检索底部纽曼边界条件
+                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第一个点
+                        [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+                        h11=[1,0].*[stx tau;tau sty].*[0 -1]';
+                        h12=[0,1].*[stx tau;tau sty].*[0 -1]';
+                        [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+                        [stx, sty, tau]=polytocoor(str,stxi,tor,xita);
+                       
+                        h21=[1,0].*[stx tau;tau sty].*[0 -1]';
+                        h22=[0,1].*[stx tau;tau sty].*[0 -1]';
+                        f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
+                        f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
+                    end   
+                end
+            elseif aa==4&&IEN(ee,4)==msh.LINES(m,1)&&IEN(ee,4)== msh.LINES(m,2) && (msh.LINES(m,3)==10)%特殊
+                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,4),1),msh.POS(IEN(ee,4),2));%第一个点
+                [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+                h11=[1,0].*[stx tau;tau sty].*[-1 0]';
+                h12=[0,1].*[stx tau;tau sty].*[-1 0]';
+                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,1),1),msh.POS(IEN(ee,1),2));%第二个点
+                [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+                h21=[1,0].*[stx tau;tau sty].*[-1 0]';
+                h22=[0,1].*[stx tau;tau sty].*[-1 0]';
+                f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,4),1),msh.POS(IEN(ee,4),2),msh.POS(IEN(ee,1),1),msh.POS(IEN(ee,1),2),h11,h12);
+                f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,4),1),msh.POS(IEN(ee,4),2),msh.POS(IEN(ee,1),1),msh.POS(IEN(ee,1),2),h21,h22);
+            % elseif IEN(ee,aa+1)==msh.LINES(m,1)&&IEN(ee,aa)== msh.LINES(m,2) && (msh.LINES(m,3)==10)%检索左侧
+            %     [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+            %     [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+            %     h11=[1,0].*[stx tau;tau sty].*[-1 0]';
+            %     h12=[0,1].*[stx tau;tau sty].*[-1 0]';
+            %     [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第二个点
+            %     [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+            %     h21=[1,0].*[stx tau;tau sty].*[-1 0]';
+            %     h22=[0,1].*[stx tau;tau sty].*[-1 0]';
+            %     f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
+            %     f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
+            end
             Ba(1,1)=Na_x;
             Ba(2,2)=Na_y;
             Ba(3,1)=Ba(2,2);
