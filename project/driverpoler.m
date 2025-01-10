@@ -207,6 +207,7 @@ for ee = 1 : n_el
             %一阶导拟合 B阵在这里完成
             %F阵纽曼边界
             h11=0;h12=0;h21=0;h22=0;
+            %由于法向需要改变，这里改写成switch形式，后续根据需要将法向添加
             if aa==n_en
                 point1=IEN(ee,aa);
                 point2=IEN(ee,1);
@@ -224,6 +225,7 @@ for ee = 1 : n_el
                         h22=[0,1]*[stx tau;tau sty]*[0 -1]';
                         f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
                         f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h21,h22);
+                        break
                     end
                 end
             else
@@ -231,7 +233,7 @@ for ee = 1 : n_el
                 point2=IEN(ee,aa+1);
                 for m=1:length(msh.LINES)
                     p1=msh.LINES(m,1);p2=msh.LINES(m,2);
-                    if(msh.LINES(m,3)==11)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2))
+                    if(msh.LINES(m,3)==8||msh.LINES(m,3)==9)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2))
 
                         [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
                         [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
@@ -243,6 +245,7 @@ for ee = 1 : n_el
                         h22=[0,1]*[stx tau;tau sty]*[-1 0]';
                         f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
                         f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+                        break
                     end
                 end
             end
@@ -251,7 +254,7 @@ for ee = 1 : n_el
             Ba(3,1)=Ba(2,2);
             Ba(3,2)=Ba(1,1);%单元内B阵完成
 
-            pp=dof*(aa-1);
+            
             %出错点1？
             %这里判断是否需要加纽曼，能加直接加
             
