@@ -3,7 +3,7 @@ clear all; clc;
 %%整体思路：利用一个逻辑值来控制当前反向，然后在当前方向视为一个自由度二维问题，解出来后循环到下一个自由度，最后拼起来即可（当前版本不考虑3维）
 %由于耦合，上述思路放弃了，转为直接使用书上思路
 %%参数导入   需要用户修改的部分
-quarter_plate_with_hole_quad;
+easier;
 
 T=1e4;R=0.5;
 % [str,stxi,tor,xita]=stresspoly(T,R,x,y);
@@ -13,7 +13,6 @@ mu=0.3;%泊松比
 coe=E/(1-mu^2);%表系数
 t=0;% test parameter
 D = zeros(3);%D阵一步到胃
-
 D(1,1)=coe;D(2,2)=D(1,1);D(1,2)=coe*mu;D(2,1)=D(1,2);D(3,3)=coe*(1-mu)/2;
 %%检验方程
 % exact solution
@@ -73,6 +72,14 @@ hh=[hh hx];
 
 IEN_tri = zeros(1,1);
 IEN = msh.QUADS(:,1:4);
+for i =1:n_en/2
+    a=IEN(i,1);
+    b=IEN(i,2);
+    IEN(i,1)=IEN(i,4);
+    IEN(i,2)=IEN(i,3);
+    IEN(i,4)=a;
+    IEN(i,3)=b;
+end
 for ee = 1:size(IEN,1)
     IEN_tri(ee*2-1,1) = IEN(ee,1);
     IEN_tri(ee*2-1,2) = IEN(ee,2);
@@ -81,15 +88,27 @@ for ee = 1:size(IEN,1)
     IEN_tri(ee*2,2) = IEN(ee,3);
     IEN_tri(ee*2,3) = IEN(ee,4);
 end
-% ID array
+%%
+
+
+% ID array   有问题
 ID = zeros(msh.nbNod,2)+1;
 counter = 0;
 for i=1:length(msh.LINES)
-    if msh.LINES(i,3)==10 || msh.LINES(i,3)==11
-        ID(msh.LINES(i,1),1)=0;
+    %有问题 以后没事别乱折叠了，出bug都不知道  改成case形式 遍历的是msh.line
+    switch msh.LINES(i,3)
+        case 8
         ID(msh.LINES(i,1),2)=0;
-        ID(msh.LINES(i,2),1)=0;
         ID(msh.LINES(i,2),2)=0;
+        case 11
+        ID(msh.LINES(i,1),2)=0;
+        ID(msh.LINES(i,2),2)=0;
+        case 9
+        ID(msh.LINES(i,1),1)=0;
+        ID(msh.LINES(i,2),1)=0;
+        case 10
+        ID(msh.LINES(i,1),1)=0;
+        ID(msh.LINES(i,2),1)=0;
     end
 end
 IDT=ID;%IDT才是真正的ID矩阵
@@ -206,7 +225,7 @@ for ee = 1 : n_el
             Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
             %一阶导拟合 B阵在这里完成
             %F阵纽曼边界
-            h11=0;h12=0;h21=0;h22=0;
+            h11=0;h12=0;h21=0;h22=0;%h这里形式需要检查
             pp=dof*(aa-1);
             %由于法向需要改变，这里改写成switch形式，后续根据需要将法向添加
             if aa==n_en
@@ -216,62 +235,68 @@ for ee = 1 : n_el
                 point1=IEN(ee,aa);
                 point2=IEN(ee,aa+1);
             end
-            for m=1:length(msh.LINES)
-                p1=msh.LINES(m,1);p2=msh.LINES(m,2);
-                if (point1==p1&&point2==p2)||(point2==p1&&point1==p2) %检索线单元是否处于边界
-                    switch msh.LINES(m,3)
-                        case 11
-                            [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
-                            [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-                            h11=[1,0]*[stx tau;tau sty]*[0 -1]';
-                            h12=[0,1]*[stx tau;tau sty]*[0 -1]';
-                            [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第一个点
-                            [stx, sty, tau]=polytocoor(str,stxi,tor,xita);
+           %if IDS(point1)
+                for m=1:length(msh.LINES)
+                    p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+                    if (point1==p1&&point2==p2)||(point2==p1&&point1==p2) %检索线单元是否处于边界
+                        switch msh.LINES(m,3)
+                            case 11
+                                IDS(point1)=0;IDS(point2)=0;
+                                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
+                                [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+                                h11=[1,0]*[stx tau;tau sty]*[0 -1]';
+                                h12=[0,1]*[stx tau;tau sty]*[0 -1]';
+                                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第一个点
+                                [stx, sty, tau]=polytocoor(str,stxi,tor,xita);
 
-                            h21=[1,0]*[stx tau;tau sty]*[0 -1]';
-                            h22=[0,1]*[stx tau;tau sty]*[0 -1]';
-                            f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-                            f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h21,h22);
-                            break
-                        case 10
-                            [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
-                            [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
-                            h11=[1,0]*[stx tau;tau sty]*[-1 0]';
-                            h12=[0,1]*[stx tau;tau sty]*[-1 0]';
-                            [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
-                            [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-                            h21=[1,0]*[stx tau;tau sty]*[-1 0]';
-                            h22=[0,1]*[stx tau;tau sty]*[-1 0]';
-                            f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-                            f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
-                            break
-                        case 9
-                            [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
-                            [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
-                            h11=[1,0]*[stx tau;tau sty]*[1 0]';
-                            h12=[0,1]*[stx tau;tau sty]*[1 0]';
-                            [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
-                            [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-                            h21=[1,0]*[stx tau;tau sty]*[1 0]';
-                            h22=[0,1]*[stx tau;tau sty]*[1 0]';
-                            f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-                            f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
-                            break
-                        case 8
-                            [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
-                            [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
-                            h11=[1,0]*[stx tau;tau sty]*[0 1]';
-                            h12=[0,1]*[stx tau;tau sty]*[0 1]';
-                            [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
-                            [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-                            h21=[1,0]*[stx tau;tau sty]*[0 1]';
-                            h22=[0,1]*[stx tau;tau sty]*[0 1]';
-                            f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-                            f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
-                            break
+                                h21=[1,0]*[stx tau;tau sty]*[0 -1]';
+                                h22=[0,1]*[stx tau;tau sty]*[0 -1]';
+                                f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+                                %f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h21,h22);
+                                break
+                            case 10
+                                IDS(point1)=0;IDS(point2)=0;
+                                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
+                                [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+                                h11=[1,0]*[stx tau;tau sty]*[-1 0]';
+                                h12=[0,1]*[stx tau;tau sty]*[-1 0]';
+                                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
+                                [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+                                h21=[1,0]*[stx tau;tau sty]*[-1 0]';
+                                h22=[0,1]*[stx tau;tau sty]*[-1 0]';
+                                %f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+                                f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+                                break
+                            case 9
+                                IDS(point1)=0;IDS(point2)=0;
+                                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
+                                [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+                                h11=[1,0]*[stx tau;tau sty]*[1 0]';
+                                h12=[0,1]*[stx tau;tau sty]*[1 0]';
+                                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
+                                [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+                                h21=[1,0]*[stx tau;tau sty]*[1 0]';
+                                h22=[0,1]*[stx tau;tau sty]*[1 0]';
+                                %f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+                                f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+                                break
+                            case 8
+                                IDS(point1)=0;IDS(point2)=0;
+                                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
+                                [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+                                h11=[1,0]*[stx tau;tau sty]*[0 1]';
+                                h12=[0,1]*[stx tau;tau sty]*[0 1]';
+                                [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
+                                [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+                                h21=[1,0]*[stx tau;tau sty]*[0 1]';
+                                h22=[0,1]*[stx tau;tau sty]*[0 1]';
+                                f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+                                %f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+                                break
+                        end
                     end
                 end
-            end
+            %end  %新添加的if的结束
             % else
             %     point1=IEN(ee,aa);
             %     point2=IEN(ee,aa+1);
@@ -432,7 +457,10 @@ error_H1=[error_H1 sqrt(eh1)];
 % plot(log(hh),log(error_H1),'b');
 
 hold on;
-trisurf(IEN_tri, x_coor, y_coor, disp(:,1));
+trisurf(IEN_tri, x_coor, y_coor, disp(:,2));
 axis equal;
 colormap jet
 shading interp
+
+
+
