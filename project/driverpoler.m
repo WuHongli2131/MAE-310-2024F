@@ -96,7 +96,7 @@ ID = zeros(msh.nbNod,2)+1;
 counter = 0;
 for i=1:length(msh.LINES)
     %有问题 以后没事别乱折叠了，出bug都不知道  改成case形式 遍历的是msh.line
-    switch msh.LINES(i,3)
+    switch msh.LINES(i,3)  %ID没问题但是积分没有积分到Y轴上，非常奇怪
         case 8
         ID(msh.LINES(i,1),2)=0;
         ID(msh.LINES(i,2),2)=0;
@@ -115,13 +115,12 @@ IDT=ID;%IDT才是真正的ID矩阵
 IDS=-(ID-1);%影子阵 用于判断纽曼边界条件
 for i=1:length(IEN)
     for j=1:n_en
-        if ID(IEN(i,j))
-            counter=counter+1;
-            IDT(IEN(i,j),1)=counter;
-            ID(IEN(i,j),1)=0;
-            counter=counter+1;
-            IDT(IEN(i,j),2)=counter;
-            ID(IEN(i,j),2)=0;
+        for m=1:2
+            if ID(IEN(i,j),m)
+                counter=counter+1;
+                IDT(IEN(i,j),m)=counter;
+                ID(IEN(i,j),m)=0;
+            end
         end
     end
 end
