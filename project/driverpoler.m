@@ -3,7 +3,7 @@ clear all; clc;
 %%整体思路：利用一个逻辑值来控制当前反向，然后在当前方向视为一个自由度二维问题，解出来后循环到下一个自由度，最后拼起来即可（当前版本不考虑3维）
 %由于耦合，上述思路放弃了，转为直接使用书上思路
 %%参数导入   需要用户修改的部分
-quarter_plate_with_hole_quad;
+easier;
 
 T=1e4;R=0.5;
 % [str,stxi,tor,xita]=stresspoly(T,R,x,y);
@@ -70,14 +70,14 @@ hh=[hh hx];
 
 IEN_tri = zeros(1,1);
 IEN = msh.QUADS(:,1:4);
-for i =1:n_en/2
-    a=IEN(i,1);
-    b=IEN(i,2);
-    IEN(i,1)=IEN(i,4);
-    IEN(i,2)=IEN(i,3);
-    IEN(i,4)=a;
-    IEN(i,3)=b;
-end
+% for i =1:n_en/2
+%     a=IEN(i,1);
+%     b=IEN(i,2);
+%     IEN(i,1)=IEN(i,4);
+%     IEN(i,2)=IEN(i,3);
+%     IEN(i,4)=a;
+%     IEN(i,3)=b;
+% end
 for ee = 1:size(IEN,1)
     IEN_tri(ee*2-1,1) = IEN(ee,1);
     IEN_tri(ee*2-1,2) = IEN(ee,2);
@@ -95,18 +95,16 @@ counter = 0;
 for i=1:length(msh.LINES)
     %有问题 以后没事别乱折叠了，出bug都不知道  改成case形式 遍历的是msh.line
     switch msh.LINES(i,3)  %ID没问题但是积分没有积分到Y轴上，非常奇怪
-        case 8
-        ID(msh.LINES(i,1),2)=0;
-        ID(msh.LINES(i,2),2)=0;
-        case 11
-        ID(msh.LINES(i,1),2)=0;
-        ID(msh.LINES(i,2),2)=0;
-        case 9
+        case 10%left
         ID(msh.LINES(i,1),1)=0;
         ID(msh.LINES(i,2),1)=0;
-        case 10
-        ID(msh.LINES(i,1),1)=0;
-        ID(msh.LINES(i,2),1)=0;
+        case 11%bottom
+        ID(msh.LINES(i,1),2)=0;
+        ID(msh.LINES(i,2),2)=0;
+        case 8%top
+        
+        case 9%right
+        
     end
 end
 IDT=ID;%IDT才是真正的ID矩阵
@@ -358,8 +356,8 @@ for ee = 1 : n_el
             PP = ID(IEN(ee,aa),i);
             if PP > 0  %比对1
                 F(PP) = F(PP) + f_ele(dof*(aa-1)+i);%算了不管了，反正我得到了K阵和F阵
-                t=PP
-                t=f_ele(dof*(aa-1)+i)
+                % t=PP
+                % t=f_ele(dof*(aa-1)+i)
                 for bb = 1 : n_en
                     for j=1:dof
                         QQ = ID(IEN(ee,bb),j);
