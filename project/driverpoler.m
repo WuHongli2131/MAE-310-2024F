@@ -3,7 +3,7 @@ clear all; clc;
 %%整体思路：利用一个逻辑值来控制当前反向，然后在当前方向视为一个自由度二维问题，解出来后循环到下一个自由度，最后拼起来即可（当前版本不考虑3维）
 %由于耦合，上述思路放弃了，转为直接使用书上思路
 %%参数导入   需要用户修改的部分
-easier;
+quarter_plate_with_hole_quad;
 
 T=1e4;R=0.5;
 % [str,stxi,tor,xita]=stresspoly(T,R,x,y);
@@ -67,8 +67,6 @@ hh=[hh hx];
 
 %%IEN部分 这里可以加一个判断 跳过重新生成Ien
 % IEN array
-
-
 
 IEN_tri = zeros(1,1);
 IEN = msh.QUADS(:,1:4);
@@ -250,8 +248,8 @@ for ee = 1 : n_el
 
                                 h21=[1,0]*[stx tau;tau sty]*[0 -1]';
                                 h22=[0,1]*[stx tau;tau sty]*[0 -1]';
-                                f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-                                %f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h21,h22);
+                                f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h21);
+                                %f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h12,h22);
                                 break
                             case 10
                                 IDS(point1)=0;IDS(point2)=0;
@@ -263,9 +261,10 @@ for ee = 1 : n_el
                                 [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
                                 h21=[1,0]*[stx tau;tau sty]*[-1 0]';
                                 h22=[0,1]*[stx tau;tau sty]*[-1 0]';
-                                %f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-                                f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+                                %f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h21);
+                                f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h12,h22);
                                 break
+
                             case 9
                                 IDS(point1)=0;IDS(point2)=0;
                                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
@@ -276,8 +275,8 @@ for ee = 1 : n_el
                                 [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
                                 h21=[1,0]*[stx tau;tau sty]*[1 0]';
                                 h22=[0,1]*[stx tau;tau sty]*[1 0]';
-                                %f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-                                f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+                                %f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h21);
+                                f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h12,h22);
                                 break
                             case 8
                                 IDS(point1)=0;IDS(point2)=0;
@@ -289,8 +288,8 @@ for ee = 1 : n_el
                                 [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
                                 h21=[1,0]*[stx tau;tau sty]*[0 1]';
                                 h22=[0,1]*[stx tau;tau sty]*[0 1]';
-                                f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-                                %f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+                                f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h21);
+                                %f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h12,h22);
                                 break
                         end
                     end
@@ -359,7 +358,8 @@ for ee = 1 : n_el
             PP = ID(IEN(ee,aa),i);
             if PP > 0  %比对1
                 F(PP) = F(PP) + f_ele(dof*(aa-1)+i);%算了不管了，反正我得到了K阵和F阵
-
+                t=PP
+                t=f_ele(dof*(aa-1)+i)
                 for bb = 1 : n_en
                     for j=1:dof
                         QQ = ID(IEN(ee,bb),j);
@@ -456,7 +456,7 @@ error_H1=[error_H1 sqrt(eh1)];
 % plot(log(hh),log(error_H1),'b');
 
 hold on;
-trisurf(IEN_tri, x_coor, y_coor, disp(:,2));
+trisurf(IEN_tri, x_coor, y_coor, disp(:,1));
 axis equal;
 colormap jet
 shading interp
