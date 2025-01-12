@@ -3,6 +3,6 @@ close all;
 hold on;
 Z = reshape(disp(:,2), n_np_x, n_np_y)';
 surf(X, Y, Z);
-
+colorbar;
 shading interp;
 axis equal;
