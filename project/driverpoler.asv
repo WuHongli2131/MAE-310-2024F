@@ -479,7 +479,7 @@ for ii = 1 : n_np   %表达本身也有问题，需要列表
     for dim=1:dof
         index = ID(ii,dim);
         if index > 0
-            disp(ii,dim) = -dn(index);
+            disp(ii,dim) = dn(index);
         else
             % modify disp with the g data. Here it does nothing because g is zero
         end
@@ -635,17 +635,17 @@ shading interp
 colorbar;
 view(2);
 %%这部分是画应变图像
-% figure;
-% trisurf(IEN_tri, x_coor, y_coor, stress(:,2));
-% axis equal;
-% colormap jet
-% shading interp
-% colorbar;
-% view(2);
-% figure;
-% trisurf(IEN_tri, x_coor, y_coor, stress(:,1));
-% axis equal;
-% colormap jet
-% shading interp
-% colorbar;
-% view(2);
+figure;
+trisurf(IEN_tri, x_coor, y_coor, stress(:,2));
+axis equal;
+colormap jet
+shading interp
+colorbar;
+view(2);
+figure;
+trisurf(IEN_tri, x_coor, y_coor, stress(:,1));
+axis equal;
+colormap jet
+shading interp
+colorbar;
+view(2);

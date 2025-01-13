@@ -1,19 +1,22 @@
+
 %2D
 clear all; clc;
 %%整体思路：利用一个逻辑值来控制当前反向，然后在当前方向视为一个自由度二维问题，解出来后循环到下一个自由度，最后拼起来即可（当前版本不考虑3维）
 %由于耦合，上述思路放弃了，转为直接使用书上思路
 %%参数导入   需要用户修改的部分
 quarter_plate_with_hole_quad;
-L=4;l=L/2;
+L=2;l=L/2;
+T=1e4;R=0.5;
 % [str,stxi,tor,xita]=stresspoly(T,R,x,y);
 % [stx,sty,tau]=polytocoor(str,stxi,tor,xita);
 E=1E9;%表示模量
 mu=0.3;%泊松比
 coe=E/(1-mu^2);%表系数
-t=0;% test parameter
+t=0;% te   st parameter
 D = zeros(3);%D阵一步到胃
 D(1,1)=coe;D(2,2)=D(1,1);D(1,2)=coe*mu;D(2,1)=D(1,2);D(3,3)=coe*(1-mu)/2;
 %%检验方程
+%%
 % exact solution
 dof=2;%自由度
 exact = @(x,y,d) (d==1)*x*(1-x)*y*(1-y)+(d==2)*x*(1-x)*y*(1-y);%dir表示当前方向，在前方加入循环即可将代码实现多次计算
@@ -90,31 +93,57 @@ end
 
 % ID array   有问题
 ID = zeros(msh.nbNod,2)+1;
+IDS=-(ID-1);%影子阵 用于判断纽曼边界条件
 counter = 0;
 for i=1:length(msh.LINES)
     %有问题 以后没事别乱折叠了，出bug都不知道  改成case形式 遍历的是msh.line
     switch msh.LINES(i,3)  %ID没问题但是积分没有积分到Y轴上，非常奇怪
         case 10%left
-        ID(msh.LINES(i,1),1)=0;
-        ID(msh.LINES(i,2),1)=0;
+
         case 11%bottom
-        ID(msh.LINES(i,1),2)=0;
-        ID(msh.LINES(i,2),2)=0;
+
         case 8%top
-        
+            IDS(msh.LINES(i,1),1)=1;
+            IDS(msh.LINES(i,1),2)=1;
+            IDS(msh.LINES(i,2),1)=1;
+            IDS(msh.LINES(i,2),2)=1;
         case 9%right
-        
+            IDS(msh.LINES(i,1),1)=1;
+            IDS(msh.LINES(i,1),2)=1;
+            IDS(msh.LINES(i,2),1)=1;
+            IDS(msh.LINES(i,2),2)=1;
+    end
+end
+for i=1:length(msh.LINES)
+    %有问题 以后没事别乱折叠了，出bug都不知道  改成case形式 遍历的是msh.line
+    switch msh.LINES(i,3)  %ID没问题但是积分没有积分到Y轴上，非常奇怪
+        case 10%left
+            ID(msh.LINES(i,1),1)=0;
+            ID(msh.LINES(i,2),1)=0;
+            IDS(msh.LINES(i,1),1)=0;
+            IDS(msh.LINES(i,2),1)=0;
+        case 11%bottom
+            ID(msh.LINES(i,1),2)=0;
+            ID(msh.LINES(i,2),2)=0;
+            IDS(msh.LINES(i,1),2)=0;
+            IDS(msh.LINES(i,2),2)=0;
+        case 8%top
+
+        case 9%right
+
     end
 end
 IDT=ID;%IDT才是真正的ID矩阵
-IDS=-(ID-1);%影子阵 用于判断纽曼边界条件
+%确认了IDS 可以用来判断纽曼边界
+
+
 for i=1:length(IEN)
     for j=1:n_en
         for m=1:2
             if ID(IEN(i,j),m)
                 counter=counter+1;
                 IDT(IEN(i,j),m)=counter;
-                ID(IEN(i,j),m)=0; 
+                ID(IEN(i,j),m)=0;
             end
         end
     end
@@ -122,7 +151,7 @@ end
 ID=IDT;%后面就不用改变量名了
 n_eq = counter;%计算内部网格
 
-
+nnn=[];
 %%k阵和f阵建立
 % allocate the stiffness matrix and load vector
 K = zeros(n_eq, n_eq );%建立空阵 9还是很抽象  不用改
@@ -135,7 +164,7 @@ F = zeros(n_eq, 1);
 %需要D阵，已定义
 %额，还是在这个循环里面把误差一起弄了吧
 %误差中k=1 但是
-
+tp=0;ri=0;le=0;bo=0;
 % loop over element to assembly the matrix and vector  下面是uh的程序
 for ee = 1 : n_el
     x_ele = x_coor( IEN(ee, 1:n_en) );
@@ -212,28 +241,122 @@ for ee = 1 : n_el
         %     end
         % end
 
+        %这里面不能进行纽曼边界积分，会重复多次
         for aa = 1 : n_en%我又得去看书了，忘记原始公式了
             Na = Quad(aa, xi(ll), eta(ll));
             [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
             Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
             Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
             %一阶导拟合 B阵在这里完成
-            %F阵纽曼边界
-            h11=0;h12=0;h21=0;h22=0;%h这里形式需要检查
-            pp=dof*(aa-1);
-            %由于法向需要改变，这里改写成switch形式，后续根据需要将法向添加
-            if aa==n_en
-                point1=IEN(ee,aa);
-                point2=IEN(ee,1);
-            else
-                point1=IEN(ee,aa);
-                point2=IEN(ee,aa+1);
-            end
-           %if IDS(point1)
-                for m=1:length(msh.LINES)
-                    p1=msh.LINES(m,1);p2=msh.LINES(m,2);
-                    if (point1==p1&&point2==p2)%检索线单元是否处于边界
-                        switch msh.LINES(m,3)
+
+            Ba(1,1)=Na_x;
+            Ba(2,2)=Na_y;
+            Ba(3,1)=Ba(2,2);
+            Ba(3,2)=Ba(1,1);%单元内B阵完成
+             pp=dof*(aa-1);
+
+            %出错点1？
+            %这里判断是否需要加纽曼，能加直接加
+
+            f_ele(pp+1) = f_ele(pp+1) + weight(ll) * detJ * f(x_l, y_l,1) * Na;%需要修改 似乎不用，i和j表示方向后就是看dir 但是两个方向是分开的 只需要最后存储的时候注意就可以了
+            f_ele(pp+2) = f_ele(pp+2) + weight(ll) * detJ * f(x_l, y_l,2) * Na;
+
+            for bb = 1 : n_en
+
+                Nb = Quad(bb, xi(ll), eta(ll));
+                [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
+                Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
+                Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
+                Bb(1,1)=Nb_x;
+                Bb(2,2)=Nb_y;
+                Bb(3,1)=Bb(2,2);
+                Bb(3,2)=Bb(1,1);
+                for i=1:dof
+                    ei=(i==1)*[1,0]+(i==2)*[0,1];
+                    for j=1:dof
+                        qq=dof*(bb-1)+j;
+                        ej=(j==1)*[1,0]+(j==2)*[0,1];
+                        k_ele(pp+i,qq) = k_ele(pp+i,qq) + weight(ll) * detJ *ei*Ba'*D*Bb*ej';%确认正确
+
+                        % t = weight(ll) * detJ *ei*Ba'*D*Bb*ej'
+                    end % end of bb loop
+                end % end of aa loop
+            end % end of quadrature loop
+        end
+    end
+  
+    %纽曼求和放在这里
+    % %因为可能要改三维。。这里ij写成循环形式
+    % %试写纽曼
+    % for aa=1:n_en
+    %     Na = Quad(aa, xi(ll), eta(ll));
+    %     [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+    %     Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
+    %     Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
+    %     %投机取巧
+    %     h11=0;h12=0;h21=0;h22=0;
+    %     if aa==n_en
+    %         point1=IEN(ee,aa);
+    %         point2=IEN(ee,1);
+    %         for m=1:length(msh.LINES)
+    %             p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+    %             if (msh.LINES(m,3)==11)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2)) %检索底部纽曼边界条件
+    %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
+    %                 [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+    %                 h11=[1,0].*[stx tau;tau sty].*[0 -1]';
+    %                 h12=[0,1].*[stx tau;tau sty].*[0 -1]';
+    %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(P2,2));%第一个点
+    %                 [stx, sty, tau]=polytocoor(str,stxi,tor,xita);
+    %
+    %                 h21=[1,0].*[stx tau;tau sty].*[0 -1]';
+    %                 h22=[0,1].*[stx tau;tau sty].*[0 -1]';
+    %                 f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+    %                 f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h21,h22);
+    %             end
+    %         end
+    %     else
+    %         point1=IEN(ee,aa);
+    %         point2=IEN(ee,aa+1);
+    %         for m=1:length(msh.LINES)
+    %             p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+    %             if(msh.LINES(m,3)==10)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2))
+    %
+    %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2));%第一个点
+    %                 [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+    %                 h11=[1,0].*[stx tau;tau sty].*[-1 0]';
+    %                 h12=[0,1].*[stx tau;tau sty].*[-1 0]';
+    %                 [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2));%第二个点
+    %                 [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+    %                 h21=[1,0].*[stx tau;tau sty].*[-1 0]';
+    %                 h22=[0,1].*[stx tau;tau sty].*[-1 0]';
+    %                 f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h11,h12);
+    %                 f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(IEN(ee,aa),1),msh.POS(IEN(ee,aa),2),msh.POS(IEN(ee,aa+1),1),msh.POS(IEN(ee,aa+1),2),h21,h22);
+    %             end
+    %         end
+    %     end
+    % end
+
+    
+    for aa = 1 : n_en
+        %F阵纽曼边界
+        h11=0;h12=0;h21=0;h22=0;%h这里形式需要检查
+        pp=dof*(aa-1);
+        %由于法向需要改变，这里改写成switch形式，后续根据需要将法向添加
+        if aa==n_en
+            point1=IEN(ee,aa);
+            point2=IEN(ee,1);
+        else
+            point1=IEN(ee,aa);
+            point2=IEN(ee,aa+1);
+        end
+        
+        %修改
+           %需要de纽曼边界需要独立出来
+            for m=1:length(msh.LINES)
+                p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+                if (point1==p1&&point2==p2)||(point1==p2 && point2==p1)%检索线单元是否处于边界
+                    nnn=[nnn;point1,point2];%检查计算所用变量
+                    switch msh.LINES(m,3)%实际上反复读取的只有3和13两个点  确定问题
                             case 11%bottom
                                 IDS(point1)=0;IDS(point2)=0;
                                 %第一个点
@@ -289,69 +412,34 @@ for ee = 1 : n_el
                                 f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1)+l,msh.POS(p1,2)+l,msh.POS(p2,1)+l,msh.POS(p2,2)+l,h11,h21);
                                 f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1)+2,msh.POS(p1,2)+2,msh.POS(p2,1)+2,msh.POS(p1,2)+2,h12,h22);
                                 break
-                        end
                     end
                 end
-            %end  %新添加的if的结束
-            % else
-            %     point1=IEN(ee,aa);
-            %     point2=IEN(ee,aa+1);
-            %     for m=1:length(msh.LINES)
-            %         p1=msh.LINES(m,1);p2=msh.LINES(m,2);
-            %         if(msh.LINES(m,3)==8||msh.LINES(m,3)==9)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2))
-            %
-            %             [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
-            %             [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
-            %             h11=[1,0]*[stx tau;tau sty]*[-1 0]';
-            %             h12=[0,1]*[stx tau;tau sty]*[-1 0]';
-            %             [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
-            %             [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
-            %             h21=[1,0]*[stx tau;tau sty]*[-1 0]';
-            %             h22=[0,1]*[stx tau;tau sty]*[-1 0]';
-            %             f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
-            %             f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
-            %             break
-            %         end
-            %     end
-
-            Ba(1,1)=Na_x;
-            Ba(2,2)=Na_y;
-            Ba(3,1)=Ba(2,2);
-            Ba(3,2)=Ba(1,1);%单元内B阵完成
-
-
-            %出错点1？
-            %这里判断是否需要加纽曼，能加直接加
-
-            f_ele(pp+1) = f_ele(pp+1) + weight(ll) * detJ * f(x_l, y_l,1) * Na;%需要修改 似乎不用，i和j表示方向后就是看dir 但是两个方向是分开的 只需要最后存储的时候注意就可以了
-            f_ele(pp+2) = f_ele(pp+2) + weight(ll) * detJ * f(x_l, y_l,2) * Na;
-
-            for bb = 1 : n_en
-
-                Nb = Quad(bb, xi(ll), eta(ll));
-                [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
-                Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
-                Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
-                Bb(1,1)=Nb_x;
-                Bb(2,2)=Nb_y;
-                Bb(3,1)=Bb(2,2);
-                Bb(3,2)=Bb(1,1);
-                for i=1:dof
-                    ei=(i==1)*[1,0]+(i==2)*[0,1];
-                    for j=1:dof
-                        qq=dof*(bb-1)+j;
-                        ej=(j==1)*[1,0]+(j==2)*[0,1];
-                        k_ele(pp+i,qq) = k_ele(pp+i,qq) + weight(ll) * detJ *ei*Ba'*D*Bb*ej';%确认正确
-
-                        % t = weight(ll) * detJ *ei*Ba'*D*Bb*ej'
-                    end % end of bb loop
-                end % end of aa loop
-            end % end of quadrature loop
-        end
+            end
+    %end  %新添加的if的结束
+        % else
+        %     point1=IEN(ee,aa);
+        %     point2=IEN(ee,aa+1);
+        %     for m=1:length(msh.LINES)
+        %         p1=msh.LINES(m,1);p2=msh.LINES(m,2);
+        %         if(msh.LINES(m,3)==8||msh.LINES(m,3)==9)&&((point1==p1&&point2==p2)||(point2==p1&&point1==p2))
+        %
+        %             [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p1,1),msh.POS(p1,2));%第一个点
+        %             [stx ,sty ,tau]=polytocoor(str,stxi,tor,xita);
+        %             h11=[1,0]*[stx tau;tau sty]*[-1 0]';
+        %             h12=[0,1]*[stx tau;tau sty]*[-1 0]';
+        %             [str,stxi,tor,xita]=stresspoly(T,R,msh.POS(p2,1),msh.POS(p2,2));%第二个点
+        %             [stx ,sty, tau]=polytocoor(str,stxi,tor,xita);
+        %             h21=[1,0]*[stx tau;tau sty]*[-1 0]';
+        %             h22=[0,1]*[stx tau;tau sty]*[-1 0]';
+        %             f_ele(pp+1)=f_ele(pp+1)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p2,2),h11,h12);
+        %             f_ele(pp+2)=f_ele(pp+2)+intergrate1D(msh.POS(p1,1),msh.POS(p1,2),msh.POS(p2,1),msh.POS(p1,2),h21,h22);
+        %             break
+        %         end
+        %     end
     end
-    %下面一段是原来ele和F的对应式子，需要补充边界条件就在这基础上修改
+  %下面一段是原来ele和F的对应式子，需要补充边界条件就在这基础上修改
     %这里需要关于h的积分 但是目前
-    for aa = 1 : n_en%组装有问题
+    for aa = 1 : n_en
         for i=1:dof
             PP = ID(IEN(ee,aa),i);
             if PP > 0  %比对1
@@ -361,7 +449,7 @@ for ee = 1 : n_el
                 for bb = 1 : n_en
                     for j=1:dof
                         QQ = ID(IEN(ee,bb),j);
-                        if QQ > 0%比对2
+                        if QQ > 0%比对22·
                             K(PP, QQ) = K(PP, QQ) + k_ele(dof*(aa-1)+i, dof*(bb-1)+j);
                         else
                             % modify F with the boundary data
@@ -378,7 +466,6 @@ for ee = 1 : n_el
     end
     % F=F+(h,Na)+a(a,B)*g;
 end
-
 % solve the stiffness matrix
 dn = K \ F;
 
@@ -519,7 +606,7 @@ error_H1=[error_H1 sqrt(eh1)];
     %shuzu
         strain(:,1)=strain(:,1)./number;
 
-trisurf(IEN_tri, x_coor, y_coor, strain(:,3));
+trisurf(IEN_tri, x_coor, y_coor, disp(:,1));
 axis equal;
 colormap jet
 shading interp
