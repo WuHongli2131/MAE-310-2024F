@@ -3,7 +3,7 @@ clear all; clc;
 %%整体思路：利用一个逻辑值来控制当前反向，然后在当前方向视为一个自由度二维问题，解出来后循环到下一个自由度，最后拼起来即可（当前版本不考虑3维）
 %由于耦合，上述思路放弃了，转为直接使用书上思路
 %%参数导入   需要用户修改的部分
-easier;
+quarter_plate_with_hole_quad;
 L=2;l=L/2;
 T=1e4;R=0.5;
 % [str,stxi,tor,xita]=stresspoly(T,R,x,y);
@@ -354,7 +354,7 @@ for ee = 1 : n_el
             for m=1:length(msh.LINES)
                 p1=msh.LINES(m,1);p2=msh.LINES(m,2);
                 if (point1==p1&&point2==p2)||(point1==p2 && point2==p1)%检索线单元是否处于边界
-                    nnn=[nnn;point1,point2];
+                    nnn=[nnn;point1,point2];%检查计算所用变量
                     switch msh.LINES(m,3)%实际上反复读取的只有3和13两个点  确定问题
                         case 11%bottom
                             IDS(point1)=0;IDS(point2)=0;
@@ -451,7 +451,7 @@ for ee = 1 : n_el
                 for bb = 1 : n_en
                     for j=1:dof
                         QQ = ID(IEN(ee,bb),j);
-                        if QQ > 0%比对2
+                        if QQ > 0%比对22·
                             K(PP, QQ) = K(PP, QQ) + k_ele(dof*(aa-1)+i, dof*(bb-1)+j);
                         else
                             % modify F with the boundary data
@@ -609,16 +609,25 @@ end
 
 %shuzu
 strain(:,1)=strain(:,1)./number;
-
+strain(:,2)=strain(:,2)./number;
+strain(:,3)=strain(:,3)./number;
 % trisurf(IEN_tri, x_coor, y_coor, disp(:,2));
 % axis equal;
 % colormap jet
 % shading interp
 % colorbar;
 % view(2);
-stress=(D*strain')';
+stress=(D*strain')';%计算应力
+%%这部分是画位移图像
 figure;
-trisurf(IEN_tri, x_coor, y_coor, stress(:,1));
+trisurf(IEN_tri, x_coor, y_coor, disp(:,2));
+axis equal;
+colormap jet
+shading interp
+colorbar;
+view(2);
+figure;
+trisurf(IEN_tri, x_coor, y_coor, disp(:,1));
 axis equal;
 colormap jet
 shading interp
